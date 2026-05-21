@@ -1,0 +1,40 @@
+name: cathedrale_saint_andre
+description: Application mobile de la Cathédrale Saint André de Yopougon
+
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Supabase — notre base de données et authentification
+  supabase_flutter: ^2.3.0
+
+  # Riverpod — gestion de l'état (on y reviendra dans les prochains modules)
+  flutter_riverpod: ^2.5.1
+
+  # Google Fonts — pour Playfair Display (titres) et DM Sans (texte)
+  google_fonts: ^6.2.1
+
+  # Pour stocker le token de session de façon sécurisée sur l'appareil
+  flutter_secure_storage: ^9.0.0
+
+  # Icônes modernes en plus de celles de Flutter
+  iconsax: ^0.0.8
+
+  # Pour le partage WhatsApp (ouvrir l'app WhatsApp)
+  url_launcher: ^6.2.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
