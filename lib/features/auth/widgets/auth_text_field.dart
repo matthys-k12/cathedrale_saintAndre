@@ -2,7 +2,6 @@
 // le style de la maquette : fond clair, label en petites majuscules,
 // icône à gauche, bordure bordeaux au focus.
 
-import 'package:cathedrale_saint_andre/cores/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../cores/constants/app_colors.dart';

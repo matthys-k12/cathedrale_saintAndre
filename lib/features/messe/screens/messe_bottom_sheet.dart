@@ -11,23 +11,18 @@
 //   _StepConfirmation       → Étape 3 : Récapitulatif + Paiement
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../cores/constants/app_colors.dart';
 import '../../../cores/constants/app_texts_styles.dart';
 import '../../../cores/supabase/supabase_client.dart';
 
-// Point d'entrée — appelle cette fonction depuis la home
+// Point d'entrée — pousse un écran plein écran
 void showMesseBottomSheet(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    // isScrollControlled = true → le BottomSheet peut prendre
-    // toute la hauteur de l'écran si nécessaire
-    isScrollControlled: true,
-    // Coins arrondis en haut
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => const MesseBottomSheet(),
     ),
-    backgroundColor: AppColors.background,
-    builder: (_) => const MesseBottomSheet(),
   );
 }
 
@@ -64,121 +59,98 @@ class _MesseBottomSheetState extends State<MesseBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // DraggableScrollableSheet permet de faire glisser le BottomSheet
-    // vers le haut pour l'agrandir
-    return DraggableScrollableSheet(
-      // Taille initiale = 92% de l'écran
-      initialChildSize: 0.92,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      // expand: false = le sheet ne prend pas plus que nécessaire
-      expand: false,
-      builder: (_, scrollController) {
-        return Column(
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      // resizeToAvoidBottomInset pousse le contenu au-dessus du clavier
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
+        child: Column(
           children: [
-            // ── En-tête fixe (logo + titre + X) ───────────────────
+            // ── En-tête : retour + barres + fermer ────────────────
             _buildHeader(),
-
-            // ── Indicateur de progression (ÉTAPE X SUR 3) ─────────
-            _buildStepIndicator(),
 
             // ── Contenu scrollable de l'étape courante ─────────────
             Expanded(
               child: SingleChildScrollView(
-                controller: scrollController,
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 child: _buildCurrentStep(),
               ),
             ),
           ],
-        );
-      },
-    );
-  }
-
-  // ── En-tête : logo Saint André + bouton fermer ────────────────────
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: Row(
-        children: [
-          // Logo rond bordeaux avec A
-          Container(
-            width: 34,
-            height: 34,
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Text(
-                'A',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'Saint André',
-            style: AppTextStyles.bodyMedium.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const Spacer(),
-          // Bouton X pour fermer le BottomSheet
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.close, size: 18),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  // ── Indicateur "ÉTAPE X SUR 3" + barre de progression ─────────────
-  Widget _buildStepIndicator() {
+  // ── En-tête éditorial : retour (si step>0) + 3 barres + fermer ─────
+  Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: Row(
         children: [
-          Text(
-            'ÉTAPE ${_currentStep + 1} SUR 3',
-            style: AppTextStyles.fieldLabel.copyWith(
-              color: AppColors.accent,
+          // Bouton retour (36×36) — visible seulement si pas étape 1
+          GestureDetector(
+            onTap: _currentStep > 0 ? _previousStep : null,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.divider, width: 1),
+                color: Colors.white,
+              ),
+              child: Icon(
+                Icons.arrow_back_rounded,
+                size: 18,
+                color: _currentStep > 0
+                    ? AppColors.ink
+                    : Colors.transparent,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          // Barre de progression en 3 segments
-          Row(
-            children: List.generate(3, (index) {
-              return Expanded(
-                child: Container(
-                  margin: EdgeInsets.only(right: index < 2 ? 6 : 0),
-                  height: 3,
-                  decoration: BoxDecoration(
-                    // Segments passés et courant = bordeaux
-                    // Segments futurs = gris
-                    color: index <= _currentStep
-                        ? AppColors.primary
-                        : AppColors.divider,
-                    borderRadius: BorderRadius.circular(2),
+
+          const SizedBox(width: 12),
+
+          // 3 barres de progression centrées
+          Expanded(
+            child: Row(
+              children: List.generate(3, (i) {
+                return Expanded(
+                  child: Container(
+                    margin: EdgeInsets.only(right: i < 2 ? 6 : 0),
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: i <= _currentStep
+                          ? AppColors.primary
+                          : AppColors.divider,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // Bouton fermer (36×36)
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.divider, width: 1),
+                color: Colors.white,
+              ),
+              child: const Icon(
+                Icons.close_rounded,
+                size: 18,
+                color: AppColors.ink,
+              ),
+            ),
           ),
         ],
       ),
@@ -202,6 +174,7 @@ class _MesseBottomSheetState extends State<MesseBottomSheet> {
         );
       case 1:
         return _StepDetailsIntention(
+          typeDemandeur: _typeDemandeur,
           typeMesse: _typeMesse,
           dateMesse: _dateMesse,
           heureMesse: _heureMesse,
@@ -380,7 +353,7 @@ class _StepChoixDemandeurState extends State<_StepChoixDemandeur> {
               backgroundColor: AppColors.primary,
               disabledBackgroundColor: AppColors.divider,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(28),
               ),
               elevation: 0,
             ),
@@ -435,26 +408,6 @@ class _DemandeurCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Icône
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.white.withOpacity(0.2)
-                    : AppColors.primary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                // Icône blanche si sélectionné, bordeaux sinon
-                color: isSelected ? Colors.white : AppColors.primary,
-                size: 22,
-              ),
-            ),
-
-            const SizedBox(width: 14),
-
             // Textes
             Expanded(
               child: Column(
@@ -462,15 +415,17 @@ class _DemandeurCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: AppTextStyles.bodyMedium.copyWith(
+                    style: GoogleFonts.dmSans(
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.white : AppColors.textPrimary,
+                      color: isSelected ? Colors.white : AppColors.ink,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: AppTextStyles.bodySmall.copyWith(
+                    style: GoogleFonts.dmSans(
+                      fontSize: 13,
                       color: isSelected
                           ? Colors.white.withOpacity(0.8)
                           : AppColors.textSecondary,
@@ -478,6 +433,27 @@ class _DemandeurCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+
+            const SizedBox(width: 14),
+
+            // Cercle radio 22×22 — rouge avec check si sélectionné
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? Colors.white : Colors.transparent,
+                border: Border.all(
+                  color: isSelected
+                      ? Colors.white
+                      : (isSelected ? AppColors.primary : AppColors.divider),
+                  width: 1.5,
+                ),
+              ),
+              child: isSelected
+                  ? Icon(Icons.check, size: 14, color: AppColors.primary)
+                  : null,
             ),
           ],
         ),
@@ -490,6 +466,7 @@ class _DemandeurCard extends StatelessWidget {
 // ÉTAPE 2 — Détails de l'intention
 // ─────────────────────────────────────────────────────────────────────
 class _StepDetailsIntention extends StatefulWidget {
+  final String typeDemandeur;
   final String typeMesse;
   final DateTime dateMesse;
   final String heureMesse;
@@ -499,6 +476,7 @@ class _StepDetailsIntention extends StatefulWidget {
   final VoidCallback onBack;
 
   const _StepDetailsIntention({
+    required this.typeDemandeur,
     required this.typeMesse,
     required this.dateMesse,
     required this.heureMesse,
@@ -516,15 +494,23 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
   late DateTime _selectedDate;
   late String _selectedHeure;
   late TextEditingController _intentionController;
+  late TextEditingController _intentionSuffixController;
 
-  // Types de messe disponibles dans le dropdown
-  final List<Map<String, String>> _typesMesse = [
-    {'value': 'action_de_grace', 'label': 'Messe d\'Action de Grâces'},
-    {'value': 'assistance_protection', 'label': 'Aide, Assistance et Protection'},
-  ];
+  // Types de messe — "repos de l'âme" uniquement pour tiers/anonymat
+  List<Map<String, String>> get _typesMesse {
+    final base = [
+      {'value': 'action_de_grace', 'label': 'Messe d\'Action de Grâces'},
+      {'value': 'assistance_protection', 'label': 'Aide, Assistance et Protection'},
+    ];
+    if (widget.typeDemandeur == 'pour_tiers' || widget.typeDemandeur == 'anonymat') {
+      base.add({'value': 'repos_ame', 'label': 'Repos de l\'Âme'});
+    }
+    return base;
+  }
 
   // Créneaux horaires — chargés depuis Supabase, fallback local par jour
   List<String> _horairesDisponibles = [];
+  Map<String, int> _delaisParHeure = {};
 
   // Horaires officiels par jour de la semaine (fallback local)
   // weekday Dart : 1=Lundi, 2=Mardi, 3=Mercredi, 4=Jeudi,
@@ -546,7 +532,9 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
     _selectedDate = widget.dateMesse;
     _selectedHeure = widget.heureMesse;
     _intentionController = TextEditingController(text: widget.intention);
-    // Appliquer le fallback local immédiatement, puis charger depuis Supabase
+    _intentionSuffixController = TextEditingController();
+    _intentionController.addListener(() => setState(() {}));
+    _intentionSuffixController.addListener(() => setState(() {}));
     _applyFallbackHoraires(_selectedDate);
     _loadHoraires(_selectedDate);
   }
@@ -554,14 +542,15 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
   @override
   void dispose() {
     _intentionController.dispose();
+    _intentionSuffixController.dispose();
     super.dispose();
   }
 
-  // Applique les horaires du fallback local pour un jour donné
   void _applyFallbackHoraires(DateTime date) {
     final horaires = _horairesFallback[date.weekday] ?? ['06:30'];
     setState(() {
       _horairesDisponibles = horaires;
+      _delaisParHeure = {};
       if (!_horairesDisponibles.contains(_selectedHeure)) {
         _selectedHeure = _horairesDisponibles.isNotEmpty
             ? _horairesDisponibles.first
@@ -570,38 +559,88 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
     });
   }
 
-  // Charger les horaires depuis Supabase selon le jour de la semaine
-  // (prioritaire sur le fallback local)
+  // Requête par colonne "jour" (string "Lundi", "Mardi"…) — même colonne que le backoffice.
+  // Si Supabase renvoie une liste vide (admin a supprimé les horaires), on vide le fallback.
+  // Si erreur réseau, le fallback déjà appliqué reste en place.
   Future<void> _loadHoraires(DateTime date) async {
-    try {
-      // En Dart, weekday : 1=Lundi ... 7=Dimanche
-      final jourSemaine = date.weekday;
+    const joursFr = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+    final jourNom = joursFr[date.weekday - 1];
 
+    try {
       final data = await supabase
           .from('messe_horaires')
-          .select('heure')
-          .eq('jour_semaine', jourSemaine)
+          .select('heure, delai_minutes')
+          .eq('jour', jourNom)
           .eq('est_actif', true)
           .order('heure');
 
-      if (mounted && data.isNotEmpty) {
-        setState(() {
-          // Convertir les résultats en liste de strings
+      if (!mounted) return;
+      setState(() {
+        if (data.isEmpty) {
+          _horairesDisponibles = [];
+          _delaisParHeure = {};
+          _selectedHeure = '';
+        } else {
           _horairesDisponibles = data
               .map<String>((h) => h['heure'].toString().substring(0, 5))
               .toList();
-          // Réinitialiser l'heure sélectionnée si elle n'est plus dispo
+          _delaisParHeure = {
+            for (final h in data)
+              h['heure'].toString().substring(0, 5): (h['delai_minutes'] as int?) ?? 120
+          };
           if (!_horairesDisponibles.contains(_selectedHeure)) {
             _selectedHeure = _horairesDisponibles.isNotEmpty
                 ? _horairesDisponibles.first
                 : '';
           }
-        });
-      }
-      // Si data est vide, le fallback local déjà appliqué reste en place
+        }
+      });
     } catch (_) {
-      // En cas d'erreur réseau, le fallback local déjà appliqué reste en place
+      // Erreur réseau : le fallback local reste en place
     }
+  }
+
+  // Retourne true si ce créneau doit être grisé (trop proche de l'heure de la messe)
+  bool _isGrise(String heure) {
+    final now = DateTime.now();
+    if (_selectedDate.year != now.year ||
+        _selectedDate.month != now.month ||
+        _selectedDate.day != now.day) return false;
+    final parts = heure.split(':');
+    if (parts.length < 2) return false;
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    final messeDt = DateTime(now.year, now.month, now.day, h, m);
+    final delai = _delaisParHeure[heure] ?? 120;
+    return now.isAfter(messeDt.subtract(Duration(minutes: delai)));
+  }
+
+  bool get _isPrefixed =>
+      _typeMesse == 'action_de_grace' ||
+      _typeMesse == 'assistance_protection' ||
+      _typeMesse == 'repos_ame';
+
+  String get _prefixLabel {
+    switch (_typeMesse) {
+      case 'action_de_grace':       return "Messe d'action de grâce pour ";
+      case 'assistance_protection': return "Aide, assistance et protection pour ";
+      case 'repos_ame':             return "Repos de l'âme de ";
+      default:                      return '';
+    }
+  }
+
+  String get _hintSuffix {
+    if (_typeMesse == 'repos_ame') return 'nom du défunt…';
+    return 'prénom(s) ou nom…';
+  }
+
+  String get _fullIntention {
+    if (_isPrefixed) {
+      final suffix = _intentionSuffixController.text.trim();
+      if (suffix.isEmpty) return '';
+      return '$_prefixLabel$suffix';
+    }
+    return _intentionController.text.trim();
   }
 
   @override
@@ -673,35 +712,61 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
           ],
         ),
         const SizedBox(height: 8),
-        // Écouteur pour rafraîchir l'état du bouton Continuer
-        ValueListenableBuilder<TextEditingValue>(
-          valueListenable: _intentionController,
-          builder: (_, __, ___) {
-            return TextField(
-              controller: _intentionController,
-              maxLines: 4,
-              style: AppTextStyles.inputText,
-              decoration: InputDecoration(
-                hintText: 'Écrivez ici le nom ou l\'intention particulière...',
-                hintStyle: AppTextStyles.inputHint,
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 1.5,
+        if (_isPrefixed)
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _prefixLabel,
+                  style: AppTextStyles.inputText.copyWith(
+                    color: AppColors.textSecondary,
                   ),
                 ),
-                contentPadding: const EdgeInsets.all(16),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: _intentionSuffixController,
+                  style: AppTextStyles.inputText,
+                  decoration: InputDecoration(
+                    hintText: _hintSuffix,
+                    hintStyle: AppTextStyles.inputHint,
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          TextField(
+            controller: _intentionController,
+            maxLines: 4,
+            style: AppTextStyles.inputText,
+            decoration: InputDecoration(
+              hintText: 'Écrivez ici le nom ou l\'intention particulière...',
+              hintStyle: AppTextStyles.inputHint,
+              filled: true,
+              fillColor: AppColors.surface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
               ),
-            );
-          },
-        ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(
+                  color: AppColors.primary,
+                  width: 1.5,
+                ),
+              ),
+              contentPadding: const EdgeInsets.all(16),
+            ),
+          ),
 
         const SizedBox(height: 32),
 
@@ -714,7 +779,7 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.primary),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(28),
                 ),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -734,20 +799,19 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
             // Bouton continuer — désactivé si heure vide OU intention vide
             Expanded(
               child: ElevatedButton(
-                onPressed: _selectedHeure.isEmpty ||
-                        _intentionController.text.trim().isEmpty
+                onPressed: _selectedHeure.isEmpty || _fullIntention.isEmpty
                     ? null
                     : () => widget.onNext(
                           _typeMesse,
                           _selectedDate,
                           _selectedHeure,
-                          _intentionController.text.trim(),
+                          _fullIntention,
                         ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   disabledBackgroundColor: AppColors.divider,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(28),
                   ),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -867,22 +931,29 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
       runSpacing: 10,
       children: _horairesDisponibles.map((heure) {
         final isSelected = heure == _selectedHeure;
+        final isGrise = _isGrise(heure);
         return GestureDetector(
-          onTap: () => setState(() => _selectedHeure = heure),
+          onTap: isGrise ? null : () => setState(() => _selectedHeure = heure),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary : AppColors.surface,
+              color: isGrise
+                  ? AppColors.divider
+                  : (isSelected ? AppColors.primary : AppColors.surface),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isSelected ? AppColors.primary : AppColors.divider,
+                color: isGrise
+                    ? AppColors.divider
+                    : (isSelected ? AppColors.primary : AppColors.divider),
               ),
             ),
             child: Text(
               heure,
               style: AppTextStyles.bodyMedium.copyWith(
-                color: isSelected ? Colors.white : AppColors.textPrimary,
+                color: isGrise
+                    ? AppColors.textSecondary
+                    : (isSelected ? Colors.white : AppColors.textPrimary),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1091,20 +1162,38 @@ class _StepConfirmationState extends State<_StepConfirmation> {
               const Divider(color: AppColors.divider, height: 1),
               const SizedBox(height: 16),
 
-              // Total en gros bordeaux — comme dans la maquette
+              // Total Playfair 26px w800 rouge — style éditorial
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     'Total à payer',
-                    style: AppTextStyles.bodyMedium.copyWith(
+                    style: GoogleFonts.dmSans(
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
                     ),
                   ),
-                  Text(
-                    '$_total FCFA',
-                    style: AppTextStyles.heading2.copyWith(
-                      color: AppColors.primary,
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '$_total',
+                          style: GoogleFonts.playfairDisplay(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' FCFA',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1123,41 +1212,68 @@ class _StepConfirmationState extends State<_StepConfirmation> {
 
         const SizedBox(height: 12),
 
-        // Grille 4 opérateurs
-        Row(
+        // Grille 2×2 des opérateurs — box initiale colorée 36×36
+        GridView.count(
+          crossAxisCount: 2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 2.8,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           children: _operateurs.map((op) {
             final isSelected = _selectedPaiement == op['id'];
-            return Expanded(
-              child: GestureDetector(
-                onTap: () =>
-                    setState(() => _selectedPaiement = op['id']),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  margin: const EdgeInsets.only(right: 8),
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? (op['color'] as Color).withOpacity(0.12)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected
-                          ? op['color'] as Color
-                          : AppColors.divider,
-                      width: isSelected ? 2 : 0.5,
-                    ),
+            final color = op['color'] as Color;
+            // Initiale de l'opérateur
+            final initiale = (op['label'] as String).substring(0, 1);
+            return GestureDetector(
+              onTap: () => setState(() => _selectedPaiement = op['id']),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? color.withOpacity(0.08) : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected ? color : AppColors.divider,
+                    width: isSelected ? 2 : 1,
                   ),
-                  child: Center(
-                    child: Text(
-                      op['label'],
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: op['color'] as Color,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 10,
+                ),
+                child: Row(
+                  children: [
+                    // Box initiale colorée 36×36
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          initiale,
+                          style: GoogleFonts.dmSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    // Label
+                    Expanded(
+                      child: Text(
+                        (op['label'] as String).replaceAll('\n', ' '),
+                        style: GoogleFonts.dmSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: color,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -1176,7 +1292,7 @@ class _StepConfirmationState extends State<_StepConfirmation> {
               backgroundColor: AppColors.primary,
               disabledBackgroundColor: AppColors.primary.withOpacity(0.6),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(28),
               ),
               elevation: 0,
             ),

@@ -259,46 +259,42 @@ class _TexteJourScreenState extends State<TexteJourScreen> {
                       );
                     }).toList(),
 
-                    // ── Section Méditation ─────────────────────────
+                    // ── Méditation — jaune + 4px border rouge ─────
                     if (_texte!['reflexion'] != null) ...[
                       const SizedBox(height: 8),
 
                       Container(
-                        padding: const EdgeInsets.all(18),
+                        padding: const EdgeInsets.fromLTRB(22, 20, 18, 20),
                         decoration: BoxDecoration(
-                          color: AppColors.accentLight,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: AppColors.accent.withOpacity(0.3),
-                            width: 0.5,
+                          color: AppColors.gold,
+                          borderRadius: BorderRadius.circular(12),
+                          border: const Border(
+                            left: BorderSide(
+                              color: AppColors.primary,
+                              width: 4,
+                            ),
                           ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.auto_awesome_outlined,
-                                  size: 14,
-                                  color: AppColors.accent,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'MÉDITATION',
-                                  style: AppTextStyles.fieldLabel.copyWith(
-                                    color: AppColors.accent,
-                                  ),
-                                ),
-                              ],
+                            // Eyebrow "Méditation" en rouge
+                            Text(
+                              'Méditation',
+                              style: AppTextStyles.fieldLabel.copyWith(
+                                fontSize: 10,
+                                letterSpacing: 1.4,
+                                color: AppColors.primary,
+                              ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 8),
                             Text(
                               _texte!['reflexion'],
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                fontStyle: FontStyle.italic,
-                                height: 1.7,
-                                color: AppColors.textPrimary,
+                              style: AppTextStyles.quote.copyWith(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.ink,
+                                height: 1.45,
                               ),
                             ),
                           ],
@@ -322,7 +318,7 @@ class _TexteJourScreenState extends State<TexteJourScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(28),
                           ),
                           elevation: 0,
                         ),

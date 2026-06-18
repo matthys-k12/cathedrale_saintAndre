@@ -1,104 +1,80 @@
-// Card "Intention de prière" — fond doré/ambre avec citation en italique
-// et bouton + bordeaux pour ajouter sa propre intention.
-// Reproduit exactement le bas de la home dans la maquette.
-
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../cores/constants/app_colors.dart';
 import '../../../cores/constants/app_texts_styles.dart';
+import '../../../cores/supabase/supabase_client.dart';
 
 class IntentionCard extends StatelessWidget {
   const IntentionCard({super.key});
-
-  // Citations qui tournent — en prod, gérées depuis Supabase
-  // ou changées quotidiennement en local
-  static const String _citation =
-      '"Seigneur, accorde-nous la paix et la force de témoigner de ton amour en Côte d\'Ivoire."';
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
         decoration: BoxDecoration(
-          // Fond ambre très clair — comme dans la maquette
-          color: AppColors.accentLight,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppColors.accent.withOpacity(0.3),
-            width: 0.5,
-          ),
+          color: AppColors.gold,
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Label "INTENTION DE PRIÈRE" en petites majuscules or
-            Row(
-              children: [
-                // Petite icône crayon/prière
-                Icon(
-                  Icons.auto_awesome_outlined,
-                  size: 14,
-                  color: AppColors.accent,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'INTENTION DE PRIÈRE',
-                  style: AppTextStyles.fieldLabel.copyWith(
-                    color: AppColors.accent,
-                    fontSize: 10,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // Citation en italique
             Text(
-              _citation,
-              style: AppTextStyles.quote.copyWith(
-                fontSize: 13,
-                color: AppColors.textPrimary,
-                height: 1.7,
+              'INTENTION DE PRIÈRE',
+              style: GoogleFonts.dmSans(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+                letterSpacing: 1.4,
               ),
             ),
-
+            const SizedBox(height: 10),
+            Text(
+              'Confiez-nous votre intention.',
+              style: GoogleFonts.playfairDisplay(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ink,
+                height: 1.2,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'La communauté la portera dans la prière cette semaine.',
+              style: GoogleFonts.dmSans(
+                fontSize: 13,
+                color: Colors.black.withValues(alpha: 0.65),
+                height: 1.45,
+              ),
+            ),
             const SizedBox(height: 16),
-
-            // Ligne du bas : texte + bouton +
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Ajouter mon intention',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.accent,
-                    fontWeight: FontWeight.w600,
-                  ),
+            GestureDetector(
+              onTap: () => _showIntentionDialog(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.ink,
+                  borderRadius: BorderRadius.circular(28),
                 ),
-
-                // Bouton + bordeaux rond
-                GestureDetector(
-                  onTap: () {
-                    // TODO : ouvrir un dialog pour saisir une intention
-                    _showIntentionDialog(context);
-                  },
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add, color: Colors.white, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Ajouter une intention',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        letterSpacing: 0.3,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.add,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
         ),
@@ -106,60 +82,99 @@ class IntentionCard extends StatelessWidget {
     );
   }
 
-  // Dialog simple pour saisir une intention personnelle
   void _showIntentionDialog(BuildContext context) {
     final controller = TextEditingController();
+    bool sending = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.background,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text(
-          'Mon intention de prière',
-          style: AppTextStyles.heading2,
-        ),
-        content: TextField(
-          controller: controller,
-          maxLines: 4,
-          decoration: InputDecoration(
-            hintText: 'Écrivez votre intention...',
-            hintStyle: AppTextStyles.inputHint,
-            filled: true,
-            fillColor: AppColors.surface,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Annuler',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO : sauvegarder l'intention dans Supabase
-              Navigator.pop(ctx);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          backgroundColor: AppColors.background,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Mon intention de prière', style: AppTextStyles.heading2),
+          content: TextField(
+            controller: controller,
+            maxLines: 4,
+            decoration: InputDecoration(
+              hintText: 'Écrivez votre intention...',
+              hintStyle: AppTextStyles.inputHint,
+              filled: true,
+              fillColor: AppColors.surface,
+              border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
               ),
-              elevation: 0,
             ),
-            child: Text('Envoyer', style: AppTextStyles.button),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Annuler',
+                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: sending
+                  ? null
+                  : () async {
+                      final texte = controller.text.trim();
+                      if (texte.isEmpty) return;
+                      setSt(() => sending = true);
+                      try {
+                        final userId = supabase.auth.currentUser?.id;
+                        await supabase.from('intentions_priere').insert({
+                          'texte': texte,
+                          'user_id': userId,
+                          'est_lue': false,
+                        });
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Intention envoyée. Merci !',
+                                style: GoogleFonts.dmSans(color: Colors.white),
+                              ),
+                              backgroundColor: AppColors.green,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          );
+                        }
+                      } catch (_) {
+                        setSt(() => sending = false);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Erreur lors de l\'envoi. Réessayez.',
+                                style: GoogleFonts.dmSans(color: Colors.white),
+                              ),
+                              backgroundColor: AppColors.primary,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                elevation: 0,
+              ),
+              child: sending
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : Text('Envoyer', style: AppTextStyles.button),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,22 +1,27 @@
-// Grille 2×2 des services principaux.
-// Reproduit exactement la maquette : icône + label sous chaque service.
-// Chaque bouton navigue vers le module correspondant.
+// Grille 2×2 des services principaux — style éditorial.
+// Cards blanches avec boîte d'icône colorée solide (pas de dégradé).
 
+import 'package:cathedrale_saint_andre/features/poadcast/screens/poadcast_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../cores/constants/app_colors.dart';
-import '../../../cores/constants/app_texts_styles.dart';
 import '../../../features/messe/screens/messe_bottom_sheet.dart';
 import '../../casuels/screens/casuels_screen.dart';
 import '../../dons/screens/dons_screnn.dart';
+
 // Modèle de données pour un service
 class _ServiceItem {
   final IconData icon;
   final String label;
+  final String subtitle;
+  final Color color;
   final VoidCallback onTap;
 
   const _ServiceItem({
     required this.icon,
     required this.label,
+    required this.subtitle,
+    required this.color,
     required this.onTap,
   });
 }
@@ -26,33 +31,40 @@ class ServicesGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Les 4 services — dans l'ordre de la maquette (gauche→droite, haut→bas)
     final services = [
       _ServiceItem(
         icon: Icons.mail_outline_rounded,
-        label: 'DEMANDE DE MESSE',
-        onTap:  () => showMesseBottomSheet(context),
+        label: 'Demande de messe',
+        subtitle: 'Intention · offrande',
+        color: AppColors.colorMesse,
+        onTap: () => showMesseBottomSheet(context),
       ),
       _ServiceItem(
         icon: Icons.receipt_long_outlined,
-        label: 'CASUELS',
+        label: 'Casuels',
+        subtitle: 'Baptême · mariage',
+        color: AppColors.colorCasuels,
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const CasuelsScreen()),
         ),
       ),
       _ServiceItem(
         icon: Icons.favorite_outline_rounded,
-        label: 'DONS & DENIER DU CULTE',
+        label: 'Dons et denier du culte',
+        subtitle: 'Soutenir la paroisse',
+        color: AppColors.colorDons,
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const DonsScreen()),
         ),
       ),
       _ServiceItem(
         icon: Icons.podcasts_rounded,
-        label: 'PODCAST',
-        onTap: () {
-          // TODO : naviguer vers Podcasts
-        },
+        label: 'Podcast',
+        subtitle: 'Homélies · catéchèse',
+        color: AppColors.colorPodcast,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PodcastScreen()),
+        ),
       ),
     ];
 
@@ -61,19 +73,23 @@ class ServicesGrid extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Services', style: AppTextStyles.heading2),
+          Text(
+            'Services',
+            style: GoogleFonts.playfairDisplay(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: AppColors.ink,
+              letterSpacing: -0.4,
+            ),
+          ),
 
           const SizedBox(height: 12),
 
-          // GridView avec 2 colonnes fixes
           GridView.count(
-            crossAxisCount: 2,        // 2 colonnes
-            crossAxisSpacing: 12,     // Espace horizontal entre cards
-            mainAxisSpacing: 12,      // Espace vertical entre cards
-            childAspectRatio: 1.6,    // Largeur / Hauteur de chaque cell
-            // IMPORTANT : shrinkWrap + NeverScrollableScrollPhysics
-            // car ce GridView est DANS un ScrollView parent.
-            // Sans ça, Flutter se plaint de scrolls imbriqués.
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.1,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: services.map((service) {
@@ -86,7 +102,7 @@ class ServicesGrid extends StatelessWidget {
   }
 }
 
-// ── Card individuelle d'un service ────────────────────────────────────
+// ── Card individuelle d'un service — fond blanc, boîte d'icône colorée ──
 class _ServiceCard extends StatelessWidget {
   final _ServiceItem service;
 
@@ -99,44 +115,53 @@ class _ServiceCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider, width: 1),
+          boxShadow: const [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+              color: AppColors.shadow,
+              blurRadius: 8,
+              offset: Offset(0, 2),
             ),
           ],
         ),
+        padding: const EdgeInsets.all(14),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icône dans un container bordeaux léger
+            // Boîte d'icône carrée couleur solide
             Container(
-              width: 44,
-              height: 44,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
+                color: service.color,
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                service.icon,
-                color: AppColors.primary,
-                size: 24,
-              ),
+              child: Icon(service.icon, color: Colors.white, size: 22),
             ),
-
-            const SizedBox(height: 10),
-
-            // Label en petites majuscules — comme dans la maquette
+            const SizedBox(height: 12),
+            // Titre Playfair 16px w700 letterSpacing -0.2
             Text(
               service.label,
-              style: AppTextStyles.fieldLabel.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 10,
+              style: GoogleFonts.playfairDisplay(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ink,
+                letterSpacing: -0.2,
+                height: 1.2,
               ),
-              textAlign: TextAlign.center,
               maxLines: 2,
+            ),
+            const SizedBox(height: 4),
+            // Sous-titre DM Sans 12px muted
+            Text(
+              service.subtitle,
+              style: GoogleFonts.dmSans(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+              maxLines: 1,
             ),
           ],
         ),

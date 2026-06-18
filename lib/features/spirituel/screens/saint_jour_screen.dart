@@ -1,11 +1,3 @@
-// Écran Saint du Jour — version améliorée :
-// - Grande image immersive plein écran avec overlay dégradé
-// - Badge date de fête liturgique
-// - Citation du saint dans une card dorée
-// - Biographie avec typographie soignée
-// - Bouton partage WhatsApp
-// - Navigation retour transparente sur l'image
-
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../cores/constants/app_colors.dart';
@@ -31,11 +23,6 @@ class _SaintJourScreenState extends State<SaintJourScreen> {
 
   Future<void> _loadSaint() async {
     try {
-      // Chercher le saint dont la fête correspond à aujourd'hui
-      // Si pas trouvé, prendre le dernier inséré
-      final today =
-          '${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
-
       List<dynamic> data = await supabase
           .from('saint_jour')
           .select()
@@ -55,7 +42,6 @@ class _SaintJourScreenState extends State<SaintJourScreen> {
     }
   }
 
-  // Partager sur WhatsApp
   Future<void> _partagerWhatsApp() async {
     if (_saint == null) return;
     final texte = Uri.encodeComponent(
@@ -106,14 +92,10 @@ class _SaintJourScreenState extends State<SaintJourScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      // extendBodyBehindAppBar permet à l'image de passer
-      // derrière la barre de status (haut de l'écran)
       extendBodyBehindAppBar: true,
-
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // Bouton retour blanc sur fond d'image
         leading: GestureDetector(
           onTap: () => Navigator.of(context).pop(),
           child: Container(
@@ -122,14 +104,9 @@ class _SaintJourScreenState extends State<SaintJourScreen> {
               color: Colors.black.withOpacity(0.3),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
+            child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
           ),
         ),
-        // Bouton partage en haut à droite
         actions: [
           GestureDetector(
             onTap: _partagerWhatsApp,
@@ -140,118 +117,78 @@ class _SaintJourScreenState extends State<SaintJourScreen> {
                 color: Colors.black.withOpacity(0.3),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.share_outlined,
-                color: Colors.white,
-                size: 20,
-              ),
+              child: const Icon(Icons.share_outlined, color: Colors.white, size: 20),
             ),
           ),
         ],
       ),
-
       body: CustomScrollView(
         slivers: [
-          // ── Image hero immersive ─────────────────────────────────
           SliverToBoxAdapter(
-            child: Stack(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Image du saint — pleine largeur, haute
+                // Photo
                 Container(
                   width: double.infinity,
-                  height: MediaQuery.of(context).size.height * 0.52,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    image: _saint!['image_url'] != null
-                        ? DecorationImage(
-                            image: NetworkImage(_saint!['image_url']),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  // Placeholder si pas d'image
-                  child: _saint!['image_url'] == null
-                      ? Center(
+                  height: 280,
+                  color: AppColors.bleuMarial,
+                  child: _saint!['image_url'] != null
+                      ? Image.network(
+                          _saint!['image_url'],
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Icon(
+                              Icons.person_outline_rounded,
+                              size: 80,
+                              color: Colors.white.withOpacity(0.4),
+                            ),
+                          ),
+                        )
+                      : Center(
                           child: Icon(
                             Icons.person_outline_rounded,
                             size: 80,
                             color: Colors.white.withOpacity(0.4),
                           ),
-                        )
-                      : null,
+                        ),
                 ),
 
-                // Dégradé du bas — transition vers fond blanc
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: MediaQuery.of(context).size.height * 0.25,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          AppColors.background,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Card nom + sous-titre flottante sur l'image
-                Positioned(
-                  bottom: 16,
-                  left: 20,
-                  right: 20,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                // Bloc bleu : kicker + nom + sous-titre
+                Container(
+                  width: double.infinity,
+                  color: AppColors.bleuMarial,
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Badge date liturgique
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.accent.withOpacity(0.9),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                _formatDate(_saint!['fete_date']).toUpperCase(),
-                                style: AppTextStyles.fieldLabel.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            // Nom du saint en grand serif
-                            Text(
-                              _saint!['nom'],
-                              style: AppTextStyles.heading1.copyWith(
-                                color: AppColors.textPrimary,
-                                fontSize: 30,
-                              ),
-                            ),
-                            // Sous-titre (Apôtre et Martyr...)
-                            if (_saint!['sous_titre'] != null)
-                              Text(
-                                _saint!['sous_titre'],
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                          ],
+                      Text(
+                        'SAINT DU JOUR · ${_formatDate(_saint!['fete_date']).toUpperCase()}',
+                        style: AppTextStyles.fieldLabel.copyWith(
+                          fontSize: 11,
+                          letterSpacing: 1.4,
+                          color: Colors.white.withOpacity(0.85),
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _saint!['nom'],
+                        style: AppTextStyles.headingOnDark.copyWith(
+                          fontSize: 28,
+                          letterSpacing: -0.3,
+                          height: 1.05,
+                        ),
+                      ),
+                      if (_saint!['sous_titre'] != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          _saint!['sous_titre'],
+                          style: AppTextStyles.bodySmall.copyWith(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.85),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -259,7 +196,7 @@ class _SaintJourScreenState extends State<SaintJourScreen> {
             ),
           ),
 
-          // ── Contenu textuel ──────────────────────────────────────
+          // Contenu textuel
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
@@ -267,35 +204,46 @@ class _SaintJourScreenState extends State<SaintJourScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 
-                  // ── Citation du saint ──────────────────────────
+                  // Citation
                   if (_saint!['citation'] != null) ...[
                     Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.fromLTRB(22, 20, 18, 20),
                       decoration: BoxDecoration(
-                        color: AppColors.accentLight,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border(
-                          left: BorderSide(
-                            color: AppColors.accent,
-                            width: 3.5,
-                          ),
+                        color: AppColors.gold,
+                        borderRadius: BorderRadius.circular(12),
+                        border: const Border(
+                          left: BorderSide(color: AppColors.primary, width: 4),
                         ),
                       ),
-                      child: Text(
-                        '"${_saint!['citation']}"',
-                        style: AppTextStyles.quote.copyWith(
-                          fontSize: 15,
-                          height: 1.7,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Citation',
+                            style: AppTextStyles.fieldLabel.copyWith(
+                              fontSize: 10,
+                              letterSpacing: 1.4,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '« ${_saint!['citation']} »',
+                            style: AppTextStyles.quote.copyWith(
+                              fontSize: 18,
+                              color: AppColors.ink,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 28),
                   ],
 
-                  // ── Séparateur "Biographie" ────────────────────
+                  // Séparateur Biographie
                   Row(
                     children: [
-                      // Barre bordeaux décorative
                       Container(
                         width: 4,
                         height: 22,
@@ -311,8 +259,7 @@ class _SaintJourScreenState extends State<SaintJourScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ── Texte biographie ───────────────────────────
-                  // Paragraphes séparés par les \n\n
+                  // Texte biographie
                   ..._saint!['biographie']
                       .toString()
                       .split('\n\n')
@@ -331,21 +278,18 @@ class _SaintJourScreenState extends State<SaintJourScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ── Bouton partage WhatsApp ────────────────────
+                  // Bouton partage WhatsApp
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton.icon(
                       onPressed: _partagerWhatsApp,
                       icon: const Icon(Icons.share_rounded, size: 18),
-                      label: Text(
-                        'PARTAGER SUR WHATSAPP',
-                        style: AppTextStyles.button,
-                      ),
+                      label: Text('PARTAGER SUR WHATSAPP', style: AppTextStyles.button),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(28),
                         ),
                         elevation: 0,
                       ),

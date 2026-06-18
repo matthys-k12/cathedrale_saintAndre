@@ -94,6 +94,22 @@ class _DonsScreenState extends State<DonsScreen> {
     return _campagnes.where((c) => c['type'] == 'categorie').toList();
   }
 
+  Map<String, dynamic>? get _campagneSeminaire {
+    try {
+      return _campagnes.firstWhere((c) => c['type'] == 'seminaire');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Map<String, dynamic>? get _campagneSecours {
+    try {
+      return _campagnes.firstWhere((c) => c['type'] == 'secours');
+    } catch (_) {
+      return null;
+    }
+  }
+
   // Montant effectif (pill ou champ libre)
   int get _montantEffectif {
     if (_montantSelectionne > 0) return _montantSelectionne;
@@ -119,10 +135,10 @@ class _DonsScreenState extends State<DonsScreen> {
     return '${buffer.toString()} FCFA';
   }
 
-  // Pourcentage de progression
+  // Pourcentage de progression — null-safe
   double _progression(Map<String, dynamic> campagne) {
-    final objectif = campagne['objectif'] as int;
-    final collecte = campagne['montant_collecte'] as int;
+    final objectif = (campagne['objectif'] as int?) ?? 0;
+    final collecte = (campagne['montant_collecte'] as int?) ?? 0;
     if (objectif == 0) return 0;
     return (collecte / objectif).clamp(0.0, 1.0);
   }
@@ -177,9 +193,10 @@ class _DonsScreenState extends State<DonsScreen> {
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('Non connecté');
 
+      final campagneId = _campagneSelectionnee!['id'];
       await supabase.from('dons').insert({
         'user_id': userId,
-        'campagne_id': _campagneSelectionnee!['id'],
+        if (campagneId != null) 'campagne_id': campagneId,
         'campagne_titre': _campagneSelectionnee!['titre'],
         'montant': _montantEffectif,
         'montant_libre': _montantSelectionne == 0,
@@ -199,7 +216,7 @@ class _DonsScreenState extends State<DonsScreen> {
               (c) => c['id'] == _campagneSelectionnee!['id']);
           if (idx != -1) {
             _campagnes[idx]['montant_collecte'] =
-                (_campagnes[idx]['montant_collecte'] as int) +
+                ((_campagnes[idx]['montant_collecte'] as int?) ?? 0) +
                     _montantEffectif;
           }
         });
@@ -249,17 +266,25 @@ class _DonsScreenState extends State<DonsScreen> {
 
                         // ── Header ─────────────────────────────────
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Dons & Denier du Culte',
-                                  style: AppTextStyles.heading2),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Soutenez la mission de votre paroisse',
-                                style: AppTextStyles.bodySmall,
+                              GestureDetector(
+                                onTap: () => Navigator.of(context).pop(),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.arrow_back_rounded, size: 20, color: AppColors.primary),
+                                    const SizedBox(width: 6),
+                                    Text('Retour', style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(height: 14),
+                              Text('Dons & Denier du Culte', style: AppTextStyles.heading2),
+                              const SizedBox(height: 4),
+                              Text('Soutenez la mission de votre paroisse', style: AppTextStyles.bodySmall),
                             ],
                           ),
                         ),
@@ -280,10 +305,18 @@ class _DonsScreenState extends State<DonsScreen> {
 
                         const SizedBox(height: 16),
 
-                        // ── Autres dons ─────────────────────────────
+                        // ── Don libre ───────────────────────────────
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: _buildAutresDonsCard(),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // ── Autres intentions ────────────────────────
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: _buildAutresIntentions(),
                         ),
 
                         const SizedBox(height: 40),
@@ -555,9 +588,9 @@ class _DonsScreenState extends State<DonsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Autres dons', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                  Text('Don libre', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 3),
-                  Text('Faites un don libre pour la paroisse,\navec une intention de prière.',
+                  Text('Faites un don libre pour la paroisse\navec une intention de prière.',
                       style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
                 ],
               ),
@@ -573,6 +606,175 @@ class _DonsScreenState extends State<DonsScreen> {
     );
   }
 
+  // ── Section Autres intentions : Séminaire & Secours Catholique ─────
+  Widget _buildAutresIntentions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Titre de section — style éditorial DM Sans allcaps
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Autres intentions',
+            style: AppTextStyles.fieldLabel.copyWith(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+
+        // Card Séminaire & Vocations
+        _buildIntentionCard(
+          icon: Icons.school_outlined,
+          label: 'Séminaire & Vocations',
+          subtitle: 'Soutenir les séminaristes du diocèse',
+          color: AppColors.bleuMarial,
+          onTap: _ouvrirSeminaire,
+        ),
+
+        const SizedBox(height: 10),
+
+        // Card Secours Catholique
+        _buildIntentionCard(
+          icon: Icons.people_outline_rounded,
+          label: 'Secours Catholique',
+          subtitle: 'Aide aux familles dans le besoin',
+          color: AppColors.green,
+          onTap: _ouvrirSecoursCall,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIntentionCard({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.divider, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Boîte icône couleur solide
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.arrow_forward_rounded, color: color, size: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Ouvrir la fiche don pour Séminaire & Vocations
+  void _ouvrirSeminaire() {
+    setState(() {
+      _campagneSelectionnee = _campagneSeminaire ?? {
+        'id': null,
+        'titre': 'Séminaire & Vocations',
+        'description': 'Soutenir les séminaristes et les vocations du diocèse d\'Abidjan.',
+      };
+      _montantSelectionne = 0;
+      _montantLibreController.clear();
+      _messageController.clear();
+    });
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      backgroundColor: AppColors.background,
+      builder: (_) => _DonSheet(
+        campagne: _campagneSelectionnee!,
+        montantsRapides: _montantsRapides,
+        montantLibreController: _montantLibreController,
+        messageController: _messageController,
+        onMontantChanged: (m) => setState(() { _montantSelectionne = m; if (m > 0) _montantLibreController.clear(); }),
+        getMontantEffectif: () => _montantEffectif,
+        getFrais: () => _fraisMobileMoney,
+        getTotal: () => _total,
+        onPayer: _handlePaiement,
+        montantSelectionne: _montantSelectionne,
+        fmt: _fmt,
+        showIntention: true,
+      ),
+    );
+  }
+
+  // Ouvrir la fiche don pour Secours Catholique
+  void _ouvrirSecoursCall() {
+    setState(() {
+      _campagneSelectionnee = _campagneSecours ?? {
+        'id': null,
+        'titre': 'Secours Catholique',
+        'description': 'Aide aux familles démunies et aux personnes dans le besoin de notre communauté.',
+      };
+      _montantSelectionne = 0;
+      _montantLibreController.clear();
+      _messageController.clear();
+    });
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      backgroundColor: AppColors.background,
+      builder: (_) => _DonSheet(
+        campagne: _campagneSelectionnee!,
+        montantsRapides: _montantsRapides,
+        montantLibreController: _montantLibreController,
+        messageController: _messageController,
+        onMontantChanged: (m) => setState(() { _montantSelectionne = m; if (m > 0) _montantLibreController.clear(); }),
+        getMontantEffectif: () => _montantEffectif,
+        getFrais: () => _fraisMobileMoney,
+        getTotal: () => _total,
+        onPayer: _handlePaiement,
+        montantSelectionne: _montantSelectionne,
+        fmt: _fmt,
+        showIntention: true,
+      ),
+    );
+  }
+
   // Ouvrir le BottomSheet Denier du Culte
   void _ouvrirDenierCulte() {
     showModalBottomSheet(
@@ -580,7 +782,7 @@ class _DonsScreenState extends State<DonsScreen> {
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       backgroundColor: AppColors.background,
-      builder: (_) => _DenierCulteSheet(onPayer: _handlePaiement, fmt: _fmt),
+      builder: (_) => _DenierCulteSheet(fmt: _fmt),
     );
   }
 
@@ -999,10 +1201,9 @@ class _DonSheetState extends State<_DonSheet> {
 // BottomSheet Denier du Culte
 // ─────────────────────────────────────────────────────────────────────
 class _DenierCulteSheet extends StatefulWidget {
-  final Future<void> Function(String operateur) onPayer;
   final String Function(int) fmt;
 
-  const _DenierCulteSheet({required this.onPayer, required this.fmt});
+  const _DenierCulteSheet({required this.fmt});
 
   @override
   State<_DenierCulteSheet> createState() => _DenierCulteSheetState();
@@ -1059,6 +1260,65 @@ class _DenierCulteSheetState extends State<_DenierCulteSheet> {
   }
 
   String _fmt(int v) => widget.fmt(v);
+
+  static const int _fraisAdmin = 200;
+  static const int _fraisMM = 30;
+
+  int get _totalAPayer => _montantEffectif + _fraisAdmin + _fraisMM;
+  bool get _recapVisible => _categorieSelectionnee.isNotEmpty && _montantEffectif > 0;
+
+  Widget _ligneRecap(String label, String valeur) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: AppTextStyles.bodySmall),
+        Text(valeur, style: AppTextStyles.bodySmall.copyWith(
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        )),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_peutValider || _isPaying) return;
+    setState(() => _isPaying = true);
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('Non connecté');
+      final payload = <String, dynamic>{
+        'user_id': userId,
+        'categorie': _categorieSelectionnee,
+        'montant': _montantEffectif,
+        'annee': DateTime.now().year,
+        if (_categorieSelectionnee == 'autre' && _objetCtrl.text.trim().isNotEmpty)
+          'objet': _objetCtrl.text.trim(),
+        'operateur_paiement': _operateur,
+        'statut': 'paye',
+      };
+      await supabase.from('denier_culte').upsert(
+        payload,
+        onConflict: 'user_id,annee',
+      );
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Denier du culte de ${_fmt(_montantEffectif)} enregistré. Merci !'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erreur : ${e.toString()}'),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    }
+    if (mounted) setState(() => _isPaying = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1199,6 +1459,60 @@ class _DenierCulteSheetState extends State<_DenierCulteSheet> {
                 ),
               ],
 
+              // Récapitulatif montant + frais
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _montantLibreCtrl,
+                builder: (_, __, ___) {
+                  if (!_recapVisible) return const SizedBox();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            _ligneRecap('Denier du culte', _fmt(_montantEffectif)),
+                            const SizedBox(height: 6),
+                            _ligneRecap('Frais administratifs', '200 FCFA'),
+                            const SizedBox(height: 6),
+                            _ligneRecap('Frais Mobile Money', '30 FCFA'),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 10),
+                              child: Divider(color: AppColors.divider, height: 1),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Total à payer',
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                        fontWeight: FontWeight.w700)),
+                                Text(
+                                  _fmt(_totalAPayer),
+                                  style: AppTextStyles.heading2.copyWith(
+                                      color: AppColors.primary),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+
               const SizedBox(height: 20),
 
               // Opérateurs
@@ -1235,11 +1549,7 @@ class _DenierCulteSheetState extends State<_DenierCulteSheet> {
               SizedBox(
                 width: double.infinity, height: 54,
                 child: ElevatedButton(
-                  onPressed: (!_peutValider || _isPaying) ? null : () async {
-                    setState(() => _isPaying = true);
-                    await widget.onPayer(_operateur);
-                    if (mounted) setState(() => _isPaying = false);
-                  },
+                  onPressed: (!_peutValider || _isPaying) ? null : _submit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     disabledBackgroundColor: AppColors.divider,

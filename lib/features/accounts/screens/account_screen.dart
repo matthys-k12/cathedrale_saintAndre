@@ -11,12 +11,17 @@
 // 5. Partager l'app — card avec logo
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../cores/constants/app_colors.dart';
 import '../../../cores/constants/app_texts_styles.dart';
 import '../../../cores/supabase/supabase_client.dart';
 import '../../auth/screens/login_screen.dart';
+import '../../admin/screens/admin_screen.dart';
+import '../../dons/screens/dons_screnn.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -35,12 +40,6 @@ class _AccountScreenState extends State<AccountScreen> {
   List<Map<String, dynamic>> _historique = [];
 
   bool _isLoading = true;
-
-  // Notifications — état local (en prod, sauvegardé dans Supabase)
-  bool _notifAnnonces = true;
-  bool _notifSaintJour = true;
-  bool _notifTexteJour = false;
-  bool _notifPodcast = true;
 
   @override
   void initState() {
@@ -154,6 +153,7 @@ class _AccountScreenState extends State<AccountScreen> {
     switch (type) {
       case 'action_de_grace': return 'Messe d\'Action de Grâce';
       case 'assistance_protection': return 'Messe d\'Assistance';
+      case 'repos_ame': return 'Repos de l\'Âme';
       default: return 'Demande de Messe';
     }
   }
@@ -167,6 +167,10 @@ class _AccountScreenState extends State<AccountScreen> {
     }
     return nom.substring(0, nom.length >= 2 ? 2 : 1).toUpperCase();
   }
+
+  // Vrai si le profil a is_admin = true dans Supabase
+  // (ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin boolean DEFAULT false;)
+  bool get _isAdmin => _profil?['is_admin'] == true;
 
   // Badge utilisateur selon ses dons
   String get _badge {
@@ -221,38 +225,55 @@ class _AccountScreenState extends State<AccountScreen> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              // ── 1. HERO PROFIL ───────────────────────────────────
+              // ── 1. HERO PROFIL — pleine largeur, sans padding ────
               _buildHeroProfil(),
 
               const SizedBox(height: 24),
 
-              // ── 2. DÉNIER DU CULTE ───────────────────────────────
-              _buildDenierCulte(),
+              // Sections inférieures — padding horizontal 20px
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
 
-              const SizedBox(height: 24),
+                    // ── 2. DÉNIER DU CULTE ───────────────────────
+                    _buildDenierCulte(),
 
-              // ── 3. HISTORIQUE ────────────────────────────────────
-              _buildHistorique(),
+                    const SizedBox(height: 24),
 
-              const SizedBox(height: 24),
+                    // ── 3. HISTORIQUE ────────────────────────────
+                    _buildHistorique(),
 
-              // ── 4. PARAMÈTRES ────────────────────────────────────
-              _buildParametres(),
+                    const SizedBox(height: 24),
 
-              const SizedBox(height: 24),
+                    // ── 4. ADMINISTRATION (visible admin seulement) ─
+                    if (_isAdmin) ...[
+                      _buildAdminButton(),
+                      const SizedBox(height: 16),
+                    ],
 
-              // ── 5. PARTAGER L'APP ────────────────────────────────
-              _buildPartagerApp(),
+                    // ── 5. PARAMÈTRES (page dédiée) ─────────────
+                    _buildParametresButton(),
 
-              const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-              // ── 6. DÉCONNEXION ───────────────────────────────────
-              _buildDeconnexion(),
+                    // ── 5. PARTAGER L'APP ────────────────────────
+                    _buildPartagerApp(),
+
+                    const SizedBox(height: 16),
+
+                    // ── 6. DÉCONNEXION ───────────────────────────
+                    _buildDeconnexion(),
+
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -260,101 +281,177 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  // ── Hero profil ────────────────────────────────────────────────────
+  // ── Barre de progression vers le prochain badge ───────────────────
+  Widget _buildBadgeProgress() {
+    final total = _stats?['total_dons'] as int? ?? 0;
+    final int cible;
+    final String prochainBadge;
+
+    if (total >= 100000) {
+      // Déjà au niveau maximum
+      return Text(
+        'Niveau maximum atteint — Merci pour vos dons !',
+        style: GoogleFonts.dmSans(fontSize: 10, color: Colors.white.withOpacity(0.75)),
+        textAlign: TextAlign.center,
+      );
+    } else if (total >= 50000) {
+      cible = 100000;
+      prochainBadge = 'Donateur Or';
+    } else {
+      cible = 50000;
+      prochainBadge = 'Donateur Argent';
+    }
+
+    final double pct = (total / cible).clamp(0.0, 1.0);
+    final int restant = cible - total;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Vers $prochainBadge',
+                style: GoogleFonts.dmSans(fontSize: 10, color: Colors.white.withOpacity(0.75)),
+              ),
+              Text(
+                '${_fmt(restant)} restants',
+                style: GoogleFonts.dmSans(fontSize: 10, color: Colors.white.withOpacity(0.75)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 5,
+              backgroundColor: Colors.white.withOpacity(0.2),
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Hero profil — bloc marine solide ─────────────────────────────
   Widget _buildHeroProfil() {
     return Column(
       children: [
-        // Avatar avec initiales
+        // Conteneur pleine largeur — pas de marge négative
         Container(
-          width: 80, height: 80,
+          width: double.infinity,
           decoration: const BoxDecoration(
-            color: AppColors.primary,
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              _initiales,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-              ),
+            color: AppColors.navy,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(28),
+              bottomRight: Radius.circular(28),
             ),
           ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // Nom complet
-        Text(
-          _profil?['nom'] ?? 'Paroissien',
-          style: AppTextStyles.heading2,
-          textAlign: TextAlign.center,
-        ),
-
-        const SizedBox(height: 4),
-
-        // Téléphone
-        Text(
-          _profil?['telephone'] ?? '',
-          style: AppTextStyles.bodySmall.copyWith(
-            color: AppColors.textSecondary,
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+          child: Column(
+            children: [
+              // Avatar — photo si disponible, sinon initiales marines
+              GestureDetector(
+                onTap: _ouvrirModificationProfil,
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                      clipBehavior: Clip.hardEdge,
+                      child: _profil?['avatar_url'] != null && (_profil!['avatar_url'] as String).isNotEmpty
+                          ? Image.network(
+                              _profil!['avatar_url'] as String,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Center(
+                                child: Text(
+                                  _initiales,
+                                  style: GoogleFonts.playfairDisplay(fontSize: 26, fontWeight: FontWeight.w700, color: AppColors.navy),
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Text(
+                                _initiales,
+                                style: GoogleFonts.playfairDisplay(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.navy,
+                                ),
+                              ),
+                            ),
+                    ),
+                    // Petite pastille crayon — indique l'édition possible
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.navy, width: 1.5),
+                      ),
+                      child: const Icon(
+                        Icons.edit_rounded,
+                        size: 12,
+                        color: AppColors.navy,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _profil?['nom'] ?? 'Paroissien',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _profil?['telephone'] ?? '',
+                style: GoogleFonts.dmSans(
+                  fontSize: 13,
+                  color: Colors.white.withOpacity(0.8),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Badge niveau actuel
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.5)),
+                ),
+                child: Text(
+                  _badge.toUpperCase(),
+                  style: GoogleFonts.dmSans(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
           ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // Badges
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Badge dynamique selon les dons
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: _badgeColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: _badgeColor.withOpacity(0.4),
-                  width: 0.5,
-                ),
-              ),
-              child: Text(
-                _badge.toUpperCase(),
-                style: AppTextStyles.fieldLabel.copyWith(
-                  color: _badgeColor,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 8),
-
-            // Badge Paroissien fixe
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: AppColors.primary.withOpacity(0.3),
-                  width: 0.5,
-                ),
-              ),
-              child: Text(
-                'PAROISSIEN',
-                style: AppTextStyles.fieldLabel.copyWith(
-                  color: AppColors.primary,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          ],
         ),
 
         const SizedBox(height: 20),
 
-        // Stats dons + messes
+        // Stats dons + messes (sous le gradient)
         Row(
           children: [
             Expanded(
@@ -391,25 +488,29 @@ class _AccountScreenState extends State<AccountScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8, offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: AppColors.divider, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 8),
-          Text(label, style: AppTextStyles.fieldLabel),
-          const SizedBox(height: 4),
+          Text(
+            label,
+            style: GoogleFonts.dmSans(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.4,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Chiffre Playfair 28px w800 couleur
           Text(
             valeur,
-            style: AppTextStyles.bodyMedium.copyWith(
-              fontWeight: FontWeight.w700,
+            style: GoogleFonts.playfairDisplay(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
               color: color,
+              letterSpacing: -0.5,
             ),
           ),
         ],
@@ -533,25 +634,25 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ],
 
-          // Bouton payer si non payé ou partiel
+          // Bouton paiement dénier
           if (!isPaye) ...[
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              height: 42,
-              child: ElevatedButton(
-                onPressed: () => _payerDenierCulte(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: statusColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: _payerDenierCulte,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.payment_rounded, size: 14, color: statusColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    isPartiel ? 'Compléter mon paiement' : 'Payer maintenant',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor,
+                    ),
                   ),
-                  elevation: 0,
-                ),
-                child: Text(
-                  isPartiel ? 'COMPLÉTER MON PAIEMENT' : 'PAYER MAINTENANT',
-                  style: AppTextStyles.button.copyWith(fontSize: 13),
-                ),
+                ],
               ),
             ),
           ],
@@ -560,69 +661,13 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  // Payer le dénier du culte
+  // Rediriger vers la page des dons pour payer le dénier du culte
   Future<void> _payerDenierCulte() async {
-    // Montant suggéré du dénier (configurable par l'admin)
-    const montantSuggere = 5000;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      backgroundColor: AppColors.background,
-      builder: (_) => _DenierPaiementSheet(
-        montantSuggere: montantSuggere,
-        onPayer: (montant, operateur) async {
-          try {
-            final userId = supabase.auth.currentUser?.id;
-            if (userId == null) return;
-
-            final annee = DateTime.now().year;
-
-            // Upsert — crée ou met à jour la cotisation
-            await supabase.from('denier_culte').upsert({
-              'user_id': userId,
-              'annee': annee,
-              'montant': montant,
-              'statut': montant >= montantSuggere ? 'paye' : 'partiel',
-              'date_paiement': DateTime.now().toIso8601String(),
-              'operateur_paiement': operateur,
-            });
-
-            if (mounted) {
-              Navigator.of(context).pop();
-              _loadData(); // Recharger les données
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    montant >= montantSuggere
-                        ? 'Dénier du culte payé. Merci !'
-                        : 'Paiement partiel enregistré.',
-                  ),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              );
-            }
-          } catch (_) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Erreur lors du paiement'),
-                  backgroundColor: AppColors.error,
-                ),
-              );
-            }
-          }
-        },
-      ),
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const DonsScreen()),
     );
+    // Recharger le statut après retour de la page dons
+    if (mounted) _loadData();
   }
 
   // ── Historique unifié ──────────────────────────────────────────────
@@ -635,11 +680,21 @@ class _AccountScreenState extends State<AccountScreen> {
           children: [
             Text('Historique', style: AppTextStyles.heading2),
             if (_historique.isNotEmpty)
-              Text(
-                'Tout voir',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => _HistoriqueCompletScreen(
+                      labelTypeMesse: _labelTypeMesse,
+                      dateRelative: _dateRelative,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  'Tout voir',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
           ],
@@ -707,37 +762,41 @@ class _AccountScreenState extends State<AccountScreen> {
       ),
       child: Row(
         children: [
-          // Icône type de transaction
+          // Dot coloré 8×8 éditorial
           Container(
-            width: 40, height: 40,
+            width: 8,
+            height: 8,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: color,
+              shape: BoxShape.circle,
             ),
-            child: Icon(item['_icon'] as IconData, color: color, size: 20),
           ),
 
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
 
-          // Label + date + opérateur
+          // Label + date
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   item['_label'] as String? ?? '',
-                  style: AppTextStyles.bodySmall.copyWith(
+                  style: GoogleFonts.dmSans(
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: AppColors.ink,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
                 Text(
                   '${_dateRelative(item['created_at'])}'
-                  '${operateur.isNotEmpty ? ' • $operateur' : ''}',
-                  style: AppTextStyles.bodySmall.copyWith(fontSize: 11),
+                  '${operateur.isNotEmpty ? ' · $operateur' : ''}',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11.5,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -745,266 +804,164 @@ class _AccountScreenState extends State<AccountScreen> {
 
           const SizedBox(width: 8),
 
-          // Montant + statut
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '+${_fmt(montant)}',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 3),
-              // Icône statut
-              Icon(
-                isValide
-                    ? Icons.check_circle_outline_rounded
-                    : Icons.access_time_rounded,
-                size: 14,
-                color: isValide ? AppColors.success : AppColors.accent,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Paramètres organisés en sections ──────────────────────────────
-  Widget _buildParametres() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-
-        // ── Section : Dénier du Culte (statut uniquement) ────────────
-        _buildSectionTitre('Dénier du Culte ${DateTime.now().year}'),
-        const SizedBox(height: 8),
-        _buildDenierStatut(),
-
-        const SizedBox(height: 16),
-
-        // ── Section : Mon profil ─────────────────────────────────────
-        _buildSectionTitre('Mon Profil'),
-        const SizedBox(height: 8),
-        _buildParamSection([
-          _ParamItem(
-            icon: Icons.person_outline_rounded,
-            label: 'Informations personnelles',
-            onTap: () => _ouvrirModificationProfil(),
-          ),
-          _ParamItem(
-            icon: Icons.lock_outline_rounded,
-            label: 'Changer mon mot de passe',
-            onTap: () => _ouvrirChangementMdp(),
-          ),
-        ]),
-
-        const SizedBox(height: 16),
-
-        // ── Section : Notifications ──────────────────────────────────
-        _buildSectionTitre('Notifications'),
-        const SizedBox(height: 8),
-        _buildNotifSection(),
-
-        const SizedBox(height: 16),
-
-        // ── Section : Légal ──────────────────────────────────────────
-        _buildSectionTitre('Légal & Confidentialité'),
-        const SizedBox(height: 8),
-        _buildParamSection([
-          _ParamItem(
-            icon: Icons.description_outlined,
-            label: 'Conditions Générales d\'Utilisation',
-            onTap: () => _ouvrirDocument('CGU'),
-          ),
-          _ParamItem(
-            icon: Icons.receipt_outlined,
-            label: 'Conditions Générales de Vente',
-            onTap: () => _ouvrirDocument('CGV'),
-          ),
-          _ParamItem(
-            icon: Icons.privacy_tip_outlined,
-            label: 'Politique de confidentialité',
-            onTap: () => _ouvrirDocument('confidentialite'),
-          ),
-          _ParamItem(
-            icon: Icons.info_outline_rounded,
-            label: 'Mentions légales',
-            onTap: () => _ouvrirDocument('mentions'),
-          ),
-        ]),
-
-        const SizedBox(height: 16),
-
-        // ── Section : Application ────────────────────────────────────
-        _buildSectionTitre('Application'),
-        const SizedBox(height: 8),
-        _buildParamSection([
-          _ParamItem(
-            icon: Icons.star_outline_rounded,
-            label: 'Noter l\'application',
-            onTap: () {},
-          ),
-          _ParamItem(
-            icon: Icons.bug_report_outlined,
-            label: 'Signaler un problème',
-            onTap: () {},
-          ),
-          _ParamItem(
-            icon: Icons.info_outline_rounded,
-            label: 'Version 1.0.0',
-            onTap: null,
-            trailing: Text(
-              'v1.0.0',
-              style: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-        ]),
-      ],
-    );
-  }
-
-  // Affiche le statut du dénier du culte dans les paramètres.
-  // Informatif seulement — pas de bouton payer ici.
-  // Le paiement se fait depuis Dons & Dénier du Culte.
-  Widget _buildDenierStatut() {
-    final annee = DateTime.now().year;
-    final statut = _denierCulte?['statut'] ?? 'non_paye';
-    final montant = _denierCulte?['montant'] as int? ?? 0;
-    final isPaye = statut == 'paye';
-    final isPartiel = statut == 'partiel';
-
-    final Color statusColor;
-    final IconData statusIcon;
-    final String statusLabel;
-    final String messageDetail;
-
-    if (isPaye) {
-      statusColor = AppColors.success;
-      statusIcon = Icons.check_circle_rounded;
-      statusLabel = 'Payé';
-      messageDetail = 'Votre cotisation $annee est à jour. Merci !';
-    } else if (isPartiel) {
-      statusColor = AppColors.accent;
-      statusIcon = Icons.timelapse_rounded;
-      statusLabel = 'Partiel';
-      messageDetail =
-          '${_fmt(montant)} versés. Complétez votre cotisation depuis "Dons & Dénier du Culte".';
-    } else {
-      statusColor = AppColors.error;
-      statusIcon = Icons.warning_amber_rounded;
-      statusLabel = 'Non payé';
-      messageDetail =
-          'Vous n\'avez pas encore cotisé pour $annee. '
-          'Rendez-vous dans "Dons & Dénier du Culte".';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: statusColor.withOpacity(0.25),
-          width: 0.5,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(statusIcon, color: statusColor, size: 22),
-          ),
-
-          const SizedBox(width: 14),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // Montant Playfair 15px w700
+          RichText(
+            text: TextSpan(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'Dénier du Culte',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        statusLabel.toUpperCase(),
-                        style: AppTextStyles.fieldLabel.copyWith(
-                          color: statusColor,
-                          fontSize: 9,
-                        ),
-                      ),
-                    ),
-                  ],
+                TextSpan(
+                  text: montant.toString().replaceAllMapped(
+                    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                    (m) => '${m[1]} ',
+                  ),
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  messageDetail,
-                  style: AppTextStyles.bodySmall.copyWith(
+                TextSpan(
+                  text: ' FCFA',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 10,
                     color: AppColors.textSecondary,
-                    height: 1.5,
                   ),
                 ),
-
-                if (!isPaye) ...[
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Accédez à "Dons & Dénier du Culte" depuis l\'accueil',
-                          ),
-                          backgroundColor: AppColors.primary,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Payer maintenant',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: statusColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_forward_rounded,
-                          size: 14,
-                          color: statusColor,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Bouton Administration — visible uniquement si is_admin = true ──
+  Widget _buildAdminButton() {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AdminScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.navy,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.navy.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Administration',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    'Gérer le contenu de l\'application',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.75),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: Colors.white.withOpacity(0.7), size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Bouton vers la page Paramètres ────────────────────────────────
+  Widget _buildParametresButton() {
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => _ParametresScreen(
+              profil: _profil,
+              onProfileUpdated: _loadData,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.divider, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.ink.withOpacity(0.07),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.tune_rounded, color: AppColors.ink, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Paramètres',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  Text(
+                    'Profil · Notifications · Légal',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 22,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1082,92 +1039,15 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  // Section notifications avec toggles
-  Widget _buildNotifSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8, offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildNotifToggle(
-            'Annonces paroissiales',
-            Icons.campaign_outlined,
-            _notifAnnonces,
-            (v) => setState(() => _notifAnnonces = v),
-            isLast: false,
-          ),
-          _buildNotifToggle(
-            'Saint du jour',
-            Icons.church_outlined,
-            _notifSaintJour,
-            (v) => setState(() => _notifSaintJour = v),
-            isLast: false,
-          ),
-          _buildNotifToggle(
-            'Texte du jour',
-            Icons.menu_book_outlined,
-            _notifTexteJour,
-            (v) => setState(() => _notifTexteJour = v),
-            isLast: false,
-          ),
-          _buildNotifToggle(
-            'Podcasts',
-            Icons.podcasts_rounded,
-            _notifPodcast,
-            (v) => setState(() => _notifPodcast = v),
-            isLast: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotifToggle(
-    String label,
-    IconData icon,
-    bool value,
-    Function(bool) onChanged, {
-    required bool isLast,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : const Border(
-                bottom: BorderSide(color: AppColors.divider, width: 0.5),
-              ),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: AppColors.textSecondary),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(label, style: AppTextStyles.bodyMedium),
-          ),
-          Switch.adaptive(
-            value: value,
-            onChanged: onChanged,
-            activeColor: AppColors.primary,
-          ),
-        ],
-      ),
-    );
-  }
-
   // ── Partager l'app ─────────────────────────────────────────────────
   Widget _buildPartagerApp() {
     return GestureDetector(
       onTap: () {
-        // TODO : partager le lien Play Store
+        Share.share(
+          'Découvrez l\'application de la Paroisse Saint André de Yopougon 🙏\n\n'
+          'Restez connecté à votre communauté : messes, annonces, actualités, dons et bien plus.',
+          subject: 'Application Saint André Yopougon',
+        );
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -1231,40 +1111,37 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  // ── Déconnexion ────────────────────────────────────────────────────
+  // ── Déconnexion — bouton pill outline rouge 1.5px ─────────────────
   Widget _buildDeconnexion() {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: OutlinedButton.icon(
-        onPressed: () async {
-          await supabase.auth.signOut();
-          if (mounted) {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-              (route) => false,
-            );
-          }
-        },
-        icon: const Icon(
-          Icons.logout_rounded,
-          size: 18,
-          color: AppColors.error,
+    return GestureDetector(
+      onTap: () async {
+        await supabase.auth.signOut();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('remember_me', false);
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        height: 48,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: AppColors.primary, width: 1.5),
         ),
-        label: Text(
-          'Se déconnecter',
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppColors.error,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(
-            color: AppColors.error.withOpacity(0.4),
-            width: 0.5,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+        child: Center(
+          child: Text(
+            'Se déconnecter',
+            style: GoogleFonts.dmSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
+              letterSpacing: 0.4,
+            ),
           ),
         ),
       ),
@@ -1282,9 +1159,10 @@ class _AccountScreenState extends State<AccountScreen> {
       backgroundColor: AppColors.background,
       builder: (_) => _ModificationProfilSheet(
         profil: _profil,
-        onSave: (nom) async {
-          await supabase.from('profiles').update({'nom': nom}).eq(
-              'id', supabase.auth.currentUser!.id);
+        onSave: (nom, avatarUrl) async {
+          final update = <String, dynamic>{'nom': nom};
+          if (avatarUrl != null) update['avatar_url'] = avatarUrl;
+          await supabase.from('profiles').update(update).eq('id', supabase.auth.currentUser!.id);
           if (mounted) {
             Navigator.of(context).pop();
             _loadData();
@@ -1368,6 +1246,438 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 }
 
+// ── Page Paramètres dédiée ───────────────────────────────────────────
+class _ParametresScreen extends StatefulWidget {
+  final Map<String, dynamic>? profil;
+  final VoidCallback onProfileUpdated;
+
+  const _ParametresScreen({
+    required this.profil,
+    required this.onProfileUpdated,
+  });
+
+  @override
+  State<_ParametresScreen> createState() => _ParametresScreenState();
+}
+
+class _ParametresScreenState extends State<_ParametresScreen> {
+  bool _notifAnnonces = true;
+  bool _notifSaintJour = true;
+  bool _notifTexteJour = false;
+  bool _notifPodcast = true;
+
+  static const _kAnnonces  = 'notif_annonces';
+  static const _kSaintJour = 'notif_saint_jour';
+  static const _kTexteJour = 'notif_texte_jour';
+  static const _kPodcast   = 'notif_podcast';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final p = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _notifAnnonces  = p.getBool(_kAnnonces)  ?? true;
+        _notifSaintJour = p.getBool(_kSaintJour) ?? true;
+        _notifTexteJour = p.getBool(_kTexteJour) ?? false;
+        _notifPodcast   = p.getBool(_kPodcast)   ?? true;
+      });
+    }
+  }
+
+  Future<void> _savePref(String key, bool value) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(key, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+
+                    // ── Mon Profil ───────────────────────────────
+                    _buildSectionLabel('Mon Profil'),
+                    const SizedBox(height: 8),
+                    _buildSection([
+                      _ParamItem(
+                        icon: Icons.person_outline_rounded,
+                        label: 'Informations personnelles',
+                        onTap: _ouvrirModificationProfil,
+                      ),
+                      _ParamItem(
+                        icon: Icons.lock_outline_rounded,
+                        label: 'Changer mon mot de passe',
+                        onTap: _ouvrirChangementMdp,
+                      ),
+                    ]),
+
+                    const SizedBox(height: 20),
+
+                    // ── Notifications ────────────────────────────
+                    _buildSectionLabel('Notifications'),
+                    const SizedBox(height: 8),
+                    _buildNotifSection(),
+
+                    const SizedBox(height: 20),
+
+                    // ── Légal ────────────────────────────────────
+                    _buildSectionLabel('Légal & Confidentialité'),
+                    const SizedBox(height: 8),
+                    _buildSection([
+                      _ParamItem(
+                        icon: Icons.description_outlined,
+                        label: 'Conditions Générales d\'Utilisation',
+                        onTap: () => _ouvrirDocument('CGU'),
+                      ),
+                      _ParamItem(
+                        icon: Icons.receipt_outlined,
+                        label: 'Conditions Générales de Vente',
+                        onTap: () => _ouvrirDocument('CGV'),
+                      ),
+                      _ParamItem(
+                        icon: Icons.privacy_tip_outlined,
+                        label: 'Politique de confidentialité',
+                        onTap: () => _ouvrirDocument('confidentialite'),
+                      ),
+                      _ParamItem(
+                        icon: Icons.info_outline_rounded,
+                        label: 'Mentions légales',
+                        onTap: () => _ouvrirDocument('mentions'),
+                      ),
+                    ]),
+
+                    const SizedBox(height: 20),
+
+                    // ── Application ──────────────────────────────
+                    _buildSectionLabel('Application'),
+                    const SizedBox(height: 8),
+                    _buildSection([
+                      _ParamItem(
+                        icon: Icons.star_outline_rounded,
+                        label: 'Noter l\'application',
+                        onTap: () {},
+                      ),
+                      _ParamItem(
+                        icon: Icons.info_outline_rounded,
+                        label: 'Version',
+                        trailing: Text(
+                          'v1.0.0',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ]),
+
+                    const SizedBox(height: 20),
+
+                    // ── Support ──────────────────────────────────
+                    _buildSectionLabel('Support'),
+                    const SizedBox(height: 8),
+                    _buildSection([
+                      _ParamItem(
+                        icon: Icons.mail_outline_rounded,
+                        label: 'Nous contacter',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const _ContactScreen(),
+                          ),
+                        ),
+                      ),
+                      _ParamItem(
+                        icon: Icons.lightbulb_outline_rounded,
+                        label: 'Faire une suggestion',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const _ContactScreen(
+                              typePredefini: 'suggestion',
+                            ),
+                          ),
+                        ),
+                      ),
+                      _ParamItem(
+                        icon: Icons.bug_report_outlined,
+                        label: 'Signaler un bug',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const _ContactScreen(
+                              typePredefini: 'bug',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Header avec bouton retour ────────────────────────────────────────
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: AppColors.divider, width: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.chevron_left_rounded,
+                color: AppColors.ink,
+                size: 24,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Text(
+            'Paramètres',
+            style: GoogleFonts.playfairDisplay(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String titre) {
+    return Text(
+      titre.toUpperCase(),
+      style: AppTextStyles.fieldLabel.copyWith(
+        color: AppColors.textSecondary,
+        fontSize: 11,
+      ),
+    );
+  }
+
+  Widget _buildSection(List<_ParamItem> items) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: items.asMap().entries.map((entry) {
+          final i = entry.key;
+          final item = entry.value;
+          final isLast = i == items.length - 1;
+          return GestureDetector(
+            onTap: item.onTap,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                border: isLast
+                    ? null
+                    : const Border(
+                        bottom: BorderSide(color: AppColors.divider, width: 0.5),
+                      ),
+              ),
+              child: Row(
+                children: [
+                  Icon(item.icon, size: 20, color: AppColors.textSecondary),
+                  const SizedBox(width: 14),
+                  Expanded(child: Text(item.label, style: AppTextStyles.bodyMedium)),
+                  item.trailing ??
+                      (item.onTap != null
+                          ? const Icon(
+                              Icons.chevron_right_rounded,
+                              size: 20,
+                              color: AppColors.textSecondary,
+                            )
+                          : const SizedBox()),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildNotifSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildNotifToggle('Annonces paroissiales', Icons.campaign_outlined, _notifAnnonces,
+              (v) { setState(() => _notifAnnonces = v); _savePref(_kAnnonces, v); }, isLast: false),
+          _buildNotifToggle('Saint du jour', Icons.church_outlined, _notifSaintJour,
+              (v) { setState(() => _notifSaintJour = v); _savePref(_kSaintJour, v); }, isLast: false),
+          _buildNotifToggle('Texte du jour', Icons.menu_book_outlined, _notifTexteJour,
+              (v) { setState(() => _notifTexteJour = v); _savePref(_kTexteJour, v); }, isLast: false),
+          _buildNotifToggle('Podcasts', Icons.podcasts_rounded, _notifPodcast,
+              (v) { setState(() => _notifPodcast = v); _savePref(_kPodcast, v); }, isLast: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotifToggle(String label, IconData icon, bool value, Function(bool) onChanged,
+      {required bool isLast}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : const Border(bottom: BorderSide(color: AppColors.divider, width: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.textSecondary),
+          const SizedBox(width: 14),
+          Expanded(child: Text(label, style: AppTextStyles.bodyMedium)),
+          Switch.adaptive(value: value, onChanged: onChanged, activeColor: AppColors.primary),
+        ],
+      ),
+    );
+  }
+
+  void _ouvrirModificationProfil() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      backgroundColor: AppColors.background,
+      builder: (_) => _ModificationProfilSheet(
+        profil: widget.profil,
+        onSave: (nom, avatarUrl) async {
+          final update = <String, dynamic>{'nom': nom};
+          if (avatarUrl != null) update['avatar_url'] = avatarUrl;
+          await supabase.from('profiles').update(update).eq('id', supabase.auth.currentUser!.id);
+          if (mounted) {
+            Navigator.of(context).pop();
+            widget.onProfileUpdated();
+          }
+        },
+      ),
+    );
+  }
+
+  void _ouvrirChangementMdp() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      backgroundColor: AppColors.background,
+      builder: (_) => _ChangementMdpSheet(
+        onSave: (newMdp) async {
+          await supabase.auth.updateUser(UserAttributes(password: newMdp));
+          if (mounted) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Mot de passe modifié avec succès'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  void _ouvrirDocument(String type) {
+    final titres = {
+      'CGU': 'Conditions Générales d\'Utilisation',
+      'CGV': 'Conditions Générales de Vente',
+      'confidentialite': 'Politique de confidentialité',
+      'mentions': 'Mentions légales',
+    };
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      backgroundColor: AppColors.background,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        expand: false,
+        builder: (_, scroll) => SingleChildScrollView(
+          controller: scroll,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(titres[type] ?? '', style: AppTextStyles.heading2),
+              const SizedBox(height: 16),
+              Text(
+                'Ce document sera fourni par la Cathédrale Saint André de Yopougon.',
+                style: AppTextStyles.bodyLarge.copyWith(height: 1.8),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Modèle item paramètre ────────────────────────────────────────────
 class _ParamItem {
   final IconData icon;
@@ -1383,212 +1693,10 @@ class _ParamItem {
   });
 }
 
-// ── Sheet paiement dénier du culte ───────────────────────────────────
-class _DenierPaiementSheet extends StatefulWidget {
-  final int montantSuggere;
-  final Function(int montant, String operateur) onPayer;
-
-  const _DenierPaiementSheet({
-    required this.montantSuggere,
-    required this.onPayer,
-  });
-
-  @override
-  State<_DenierPaiementSheet> createState() => _DenierPaiementSheetState();
-}
-
-class _DenierPaiementSheetState extends State<_DenierPaiementSheet> {
-  int _montant = 0;
-  String _operateur = 'wave';
-  final _montantController = TextEditingController();
-
-  final List<Map<String, dynamic>> _operateurs = [
-    {'id': 'wave', 'label': 'Wave', 'color': const Color(0xFF1BA0F5)},
-    {'id': 'orange', 'label': 'Orange\nMoney', 'color': const Color(0xFFFF6600)},
-    {'id': 'mtn', 'label': 'MTN\nMoMo', 'color': const Color(0xFFFFCC00)},
-    {'id': 'moov', 'label': 'Moov\nMoney', 'color': const Color(0xFF0066CC)},
-  ];
-
-  int get _montantEffectif {
-    if (_montant > 0) return _montant;
-    return int.tryParse(_montantController.text) ?? 0;
-  }
-
-  @override
-  void dispose() {
-    _montantController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text('Dénier du Culte ${DateTime.now().year}',
-                style: AppTextStyles.heading2),
-            const SizedBox(height: 6),
-            Text(
-              'Montant suggéré : ${widget.montantSuggere} FCFA',
-              style: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.accent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Pills montants
-            Wrap(
-              spacing: 8, runSpacing: 8,
-              children: [1000, 2500, 5000, 10000].map((m) {
-                final isSelected = _montant == m;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _montant = m;
-                      _montantController.clear();
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.primary
-                          : AppColors.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.divider,
-                      ),
-                    ),
-                    child: Text(
-                      '$m F',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: isSelected ? Colors.white : AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-            // Montant libre
-            TextField(
-              controller: _montantController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              onChanged: (_) => setState(() => _montant = 0),
-              decoration: InputDecoration(
-                hintText: 'Autre montant (F CFA)',
-                hintStyle: AppTextStyles.inputHint,
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary, width: 1.5,
-                  ),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 14,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text('MODE DE PAIEMENT', style: AppTextStyles.fieldLabel),
-            const SizedBox(height: 10),
-            Row(
-              children: _operateurs.map((op) {
-                final isSelected = _operateur == op['id'];
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _operateur = op['id']),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      margin: const EdgeInsets.only(right: 8),
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? (op['color'] as Color).withOpacity(0.12)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isSelected
-                              ? op['color'] as Color
-                              : AppColors.divider,
-                          width: isSelected ? 2 : 0.5,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          op['label'],
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: op['color'] as Color,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 9,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _montantEffectif < 100
-                    ? null
-                    : () => widget.onPayer(_montantEffectif, _operateur),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  disabledBackgroundColor: AppColors.divider,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: Text('PAYER MAINTENANT', style: AppTextStyles.button),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ── Sheet modification profil ────────────────────────────────────────
 class _ModificationProfilSheet extends StatefulWidget {
   final Map<String, dynamic>? profil;
-  final Function(String nom) onSave;
+  final Future<void> Function(String nom, String? avatarUrl) onSave;
 
   const _ModificationProfilSheet({
     required this.profil,
@@ -1600,16 +1708,16 @@ class _ModificationProfilSheet extends StatefulWidget {
       _ModificationProfilSheetState();
 }
 
-class _ModificationProfilSheetState
-    extends State<_ModificationProfilSheet> {
+class _ModificationProfilSheetState extends State<_ModificationProfilSheet> {
   late TextEditingController _nomController;
+  String? _newAvatarUrl;
+  bool _uploadingAvatar = false;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _nomController = TextEditingController(
-      text: widget.profil?['nom'] ?? '',
-    );
+    _nomController = TextEditingController(text: widget.profil?['nom'] ?? '');
   }
 
   @override
@@ -1618,12 +1726,40 @@ class _ModificationProfilSheetState
     super.dispose();
   }
 
+  Future<void> _pickAndUpload() async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 400);
+    if (file == null) return;
+    setState(() => _uploadingAvatar = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final ext = file.path.split('.').last;
+      final userId = supabase.auth.currentUser!.id;
+      final path = 'avatars/$userId.$ext';
+      await supabase.storage.from('avatars').uploadBinary(
+        path, bytes,
+        fileOptions: FileOptions(upsert: true, contentType: 'image/$ext'),
+      );
+      final url = supabase.storage.from('avatars').getPublicUrl(path);
+      setState(() { _newAvatarUrl = '$url?t=${DateTime.now().millisecondsSinceEpoch}'; });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erreur upload : ${e.toString()}'),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentAvatar = _newAvatarUrl ?? widget.profil?['avatar_url'] as String?;
+
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -1632,14 +1768,48 @@ class _ModificationProfilSheetState
             Center(
               child: Container(
                 width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+                decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(2)),
               ),
             ),
             const SizedBox(height: 20),
             Text('Modifier mon profil', style: AppTextStyles.heading2),
+            const SizedBox(height: 20),
+
+            // Avatar — tap pour changer
+            Center(
+              child: GestureDetector(
+                onTap: _pickAndUpload,
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      width: 80, height: 80,
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.surface),
+                      clipBehavior: Clip.hardEdge,
+                      child: _uploadingAvatar
+                          ? const Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2))
+                          : currentAvatar != null && currentAvatar.isNotEmpty
+                              ? Image.network(currentAvatar, fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 36, color: AppColors.textSecondary))
+                              : const Icon(Icons.person, size: 36, color: AppColors.textSecondary),
+                    ),
+                    Container(
+                      width: 26, height: 26,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary, shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Center(
+              child: Text('Changer la photo', style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+            ),
+
             const SizedBox(height: 20),
             Text('NOM COMPLET', style: AppTextStyles.fieldLabel),
             const SizedBox(height: 8),
@@ -1649,19 +1819,12 @@ class _ModificationProfilSheetState
               decoration: InputDecoration(
                 filled: true,
                 fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary, width: 1.5,
-                  ),
+                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 14,
-                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
             ),
             const SizedBox(height: 24),
@@ -1669,7 +1832,10 @@ class _ModificationProfilSheetState
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: () => widget.onSave(_nomController.text.trim()),
+                onPressed: _saving ? null : () async {
+                  setState(() => _saving = true);
+                  await widget.onSave(_nomController.text.trim(), _newAvatarUrl);
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(
@@ -1678,6 +1844,405 @@ class _ModificationProfilSheetState
                   elevation: 0,
                 ),
                 child: Text('ENREGISTRER', style: AppTextStyles.button),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Écran historique complet ─────────────────────────────────────────
+class _HistoriqueCompletScreen extends StatefulWidget {
+  final String Function(String?) labelTypeMesse;
+  final String Function(String?) dateRelative;
+
+  const _HistoriqueCompletScreen({
+    required this.labelTypeMesse,
+    required this.dateRelative,
+  });
+
+  @override
+  State<_HistoriqueCompletScreen> createState() => _HistoriqueCompletScreenState();
+}
+
+class _HistoriqueCompletScreenState extends State<_HistoriqueCompletScreen> {
+  List<Map<String, dynamic>> _historique = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAll();
+  }
+
+  Future<void> _loadAll() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final results = await Future.wait([
+        supabase
+            .from('dons')
+            .select('id, campagne_titre, montant, statut, created_at, operateur_paiement')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false),
+        supabase
+            .from('messe_demandes')
+            .select('id, type_messe, date_messe, montant, statut, created_at')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false),
+        supabase
+            .from('casuel_demandes')
+            .select('id, label, montant, statut, created_at')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false),
+      ]);
+
+      final dons = (results[0] as List).map((d) => {
+        ...Map<String, dynamic>.from(d),
+        '_label': d['campagne_titre'],
+        '_color': const Color(0xFF1D9E75),
+      }).toList();
+
+      final messes = (results[1] as List).map((m) => {
+        ...Map<String, dynamic>.from(m),
+        '_label': widget.labelTypeMesse(m['type_messe']),
+        '_color': AppColors.primary,
+      }).toList();
+
+      final casuels = (results[2] as List).map((c) => {
+        ...Map<String, dynamic>.from(c),
+        '_label': c['label'],
+        '_color': const Color(0xFFC9922A),
+      }).toList();
+
+      final all = [...dons, ...messes, ...casuels];
+      all.sort((a, b) {
+        final dateA = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(0);
+        final dateB = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(0);
+        return dateB.compareTo(dateA);
+      });
+
+      if (mounted) setState(() { _historique = all; _isLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: const Icon(Icons.chevron_left_rounded, color: AppColors.ink, size: 28),
+        ),
+        title: Text(
+          'Historique',
+          style: GoogleFonts.playfairDisplay(
+            fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.ink,
+          ),
+        ),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(0.5),
+          child: Divider(height: 0.5, color: AppColors.divider),
+        ),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          : _historique.isEmpty
+              ? Center(
+                  child: Text('Aucune transaction', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  itemCount: _historique.length,
+                  itemBuilder: (_, i) {
+                    final item = _historique[i];
+                    final color = item['_color'] as Color;
+                    final montant = item['montant'] as int? ?? 0;
+                    final operateur = item['operateur_paiement'] as String? ?? '';
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.divider, width: 0.5),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8, height: 8,
+                            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item['_label'] as String? ?? '',
+                                  style: GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.ink),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${widget.dateRelative(item['created_at'])}${operateur.isNotEmpty ? ' · $operateur' : ''}',
+                                  style: GoogleFonts.dmSans(fontSize: 11.5, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: montant.toString().replaceAllMapped(
+                                    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ',
+                                  ),
+                                  style: GoogleFonts.playfairDisplay(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink),
+                                ),
+                                TextSpan(
+                                  text: ' FCFA',
+                                  style: GoogleFonts.dmSans(fontSize: 10, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+    );
+  }
+}
+
+// ── Écran Nous contacter / Suggestions ────────────────────────────────
+class _ContactScreen extends StatefulWidget {
+  final String? typePredefini;
+  const _ContactScreen({this.typePredefini});
+
+  @override
+  State<_ContactScreen> createState() => _ContactScreenState();
+}
+
+class _ContactScreenState extends State<_ContactScreen> {
+  final _objetCtrl = TextEditingController();
+  final _messageCtrl = TextEditingController();
+  late String _type;
+  bool _isLoading = false;
+
+  static const _types = [
+    {'value': 'suggestion', 'label': 'Suggestion'},
+    {'value': 'reclamation', 'label': 'Réclamation'},
+    {'value': 'bug', 'label': 'Signalement de bug'},
+    {'value': 'autre', 'label': 'Autre'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _type = widget.typePredefini ?? 'suggestion';
+  }
+
+  @override
+  void dispose() {
+    _objetCtrl.dispose();
+    _messageCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _envoyer() async {
+    if (_objetCtrl.text.trim().isEmpty || _messageCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez remplir l\'objet et le message'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      await supabase.from('contact_messages').insert({
+        'user_id': userId,
+        'type': _type,
+        'objet': _objetCtrl.text.trim(),
+        'message': _messageCtrl.text.trim(),
+        'est_lu': false,
+      });
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Message envoyé. Merci pour votre retour !'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur : ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(bottom: BorderSide(color: AppColors.divider, width: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.chevron_left_rounded, color: AppColors.ink, size: 24),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Text(
+                    'Nous contacter',
+                    style: GoogleFonts.playfairDisplay(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    Text(
+                      'Une question, une suggestion ou un problème ? Écrivez-nous, nous vous répondrons rapidement.',
+                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Type
+                    Text('Type de message', style: AppTextStyles.fieldLabel),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _type,
+                          isExpanded: true,
+                          style: AppTextStyles.inputText,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
+                          items: _types.map((t) => DropdownMenuItem(
+                            value: t['value'],
+                            child: Text(t['label']!),
+                          )).toList(),
+                          onChanged: (v) { if (v != null) setState(() => _type = v); },
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Objet
+                    Text('Objet', style: AppTextStyles.fieldLabel),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _objetCtrl,
+                      style: AppTextStyles.inputText,
+                      decoration: InputDecoration(
+                        hintText: 'Résumez en quelques mots…',
+                        hintStyle: AppTextStyles.inputHint,
+                        filled: true,
+                        fillColor: AppColors.surface,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                        contentPadding: const EdgeInsets.all(16),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Message
+                    Text('Message', style: AppTextStyles.fieldLabel),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _messageCtrl,
+                      maxLines: 6,
+                      style: AppTextStyles.inputText,
+                      decoration: InputDecoration(
+                        hintText: 'Décrivez votre message en détail…',
+                        hintStyle: AppTextStyles.inputHint,
+                        filled: true,
+                        fillColor: AppColors.surface,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                        contentPadding: const EdgeInsets.all(16),
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _envoyer,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                          elevation: 0,
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(width: 22, height: 22,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                            : Text('Envoyer le message', style: AppTextStyles.button),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

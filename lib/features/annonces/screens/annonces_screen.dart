@@ -8,9 +8,12 @@
 // - Design sobre mais nettement plus riche que la maquette initiale
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../cores/constants/app_colors.dart';
 import '../../../cores/constants/app_texts_styles.dart';
 import '../../../cores/supabase/supabase_client.dart';
+import '../../notifications/screens/notifications_screen.dart';
 
 class AnnoncesScreen extends StatefulWidget {
   const AnnoncesScreen({super.key});
@@ -23,6 +26,52 @@ class _AnnoncesScreenState extends State<AnnoncesScreen> {
   List<Map<String, dynamic>> _annonces = [];
   bool _isLoading = true;
   String _filtreActif = 'tout'; // filtre catégorie
+
+  // Données de démonstration — affichées quand Supabase ne retourne rien
+  static const List<Map<String, dynamic>> _mockAnnonces = [
+    {
+      'titre': 'Retraite spirituelle de carême',
+      'contenu': 'La paroisse vous invite à une retraite spirituelle durant le temps de carême. Un temps de ressourcement pour tous les paroissiens qui souhaitent approfondir leur foi et s\'ouvrir à la grâce de Dieu.',
+      'categorie': 'activites',
+      'est_urgent': false,
+      'created_at': '2026-05-24T09:00:00',
+    },
+    {
+      'titre': 'Publication des bans de mariage',
+      'contenu': 'Nous informons la communauté paroissiale de la publication des bans de mariage de M. Jean-Claude Koné et Mme Awa Ouattara, prévue le samedi 13 juin 2026 à 10h30.',
+      'categorie': 'mariage',
+      'est_urgent': false,
+      'created_at': '2026-05-22T14:30:00',
+    },
+    {
+      'titre': 'Collecte urgente pour les sinistrés',
+      'contenu': 'Suite aux inondations récentes dans le quartier, la paroisse organise une collecte d\'urgence pour venir en aide aux familles sinistrées. Vos dons matériels et financiers sont attendus à l\'accueil.',
+      'categorie': 'associations',
+      'est_urgent': true,
+      'created_at': '2026-05-21T08:00:00',
+    },
+    {
+      'titre': 'Groupe de prière "Cœur à Cœur"',
+      'contenu': 'Le groupe de prière se réunit chaque jeudi à 18h30 dans la salle Saint Augustin. Nouveaux membres bienvenus. Thème du mois : "La Miséricorde divine".',
+      'categorie': 'prieres',
+      'est_urgent': false,
+      'created_at': '2026-05-19T10:00:00',
+    },
+    {
+      'titre': 'Assemblée générale CEB Yopougon-Gare',
+      'contenu': 'Les membres de la Communauté Ecclésiale de Base (CEB) Yopougon-Gare sont convoqués en assemblée générale le dimanche 01 juin après la messe de 10h00.',
+      'categorie': 'ceb',
+      'est_urgent': false,
+      'created_at': '2026-05-17T16:00:00',
+    },
+    {
+      'titre': 'Rappel à Dieu — Sr Marie-Céleste ABOBO',
+      'contenu': 'La famille ABOBO et la communauté paroissiale ont la douleur de faire part du rappel à Dieu de Sœur Marie-Céleste ABOBO, le dimanche 18 mai 2026. Les obsèques auront lieu à l\'église.',
+      'categorie': 'rappel_a_dieu',
+      'est_urgent': false,
+      'created_at': '2026-05-18T12:00:00',
+    },
+  ];
 
   // Catégories disponibles avec leurs couleurs
   final List<Map<String, dynamic>> _categories = [
@@ -60,21 +109,29 @@ class _AnnoncesScreenState extends State<AnnoncesScreen> {
     }
   }
 
+  // Données effectives : Supabase si disponible, sinon mock de démonstration
+  List<Map<String, dynamic>> get _annoncesEffectives =>
+      _annonces.isEmpty ? _mockAnnonces : _annonces;
+
   // Filtrer les annonces selon la catégorie active
   List<Map<String, dynamic>> get _annoncesFiltrees {
-    if (_filtreActif == 'tout') return _annonces;
-    return _annonces
+    if (_filtreActif == 'tout') return _annoncesEffectives;
+    return _annoncesEffectives
         .where((a) => a['categorie'] == _filtreActif)
         .toList();
   }
 
   // Couleur d'une catégorie
   Color _couleurCategorie(String categorie) {
-    final cat = _categories.firstWhere(
-      (c) => c['id'] == categorie,
-      orElse: () => _categories.last,
-    );
-    return cat['color'] as Color;
+    switch (categorie) {
+      case 'activites': return const Color(0xFF7B1E3A);
+      case 'mariage': return const Color(0xFFC9922A);
+      case 'prieres': return const Color(0xFF1D9E75);
+      case 'ceb': return const Color(0xFF185FA5);
+      case 'associations': return const Color(0xFF6B3FA0);
+      case 'rappel_a_dieu': return const Color(0xFF555555);
+      default: return AppColors.primary;
+    }
   }
 
   // Date relative : "Aujourd'hui", "Il y a 2 jours", etc.
@@ -93,50 +150,67 @@ class _AnnoncesScreenState extends State<AnnoncesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF7F3EE),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            // ── Header ───────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            // ── Header rouge avec vague en bas ────────────────────
+            ClipPath(
+              clipper: _AnnoncesHeaderClipper(),
+              child: Container(
+              color: AppColors.primary,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 42),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Annonces', style: AppTextStyles.heading2),
+                      Text(
+                        'Annonces',
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
                       Text(
                         'Paroisse Saint André',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 13,
+                          color: Colors.white.withValues(alpha:0.8),
                           fontStyle: FontStyle.italic,
                         ),
                       ),
                     ],
                   ),
                   const Spacer(),
-                  // Cloche notifications
-                  Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
-                      shape: BoxShape.circle,
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
                     ),
-                    child: const Icon(
-                      Icons.notifications_outlined,
-                      color: AppColors.primary,
-                      size: 20,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha:0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.notifications_outlined,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+            ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
 
             // ── Filtres catégories (scroll horizontal) ────────────
             SizedBox(
@@ -158,26 +232,20 @@ class _AnnoncesScreenState extends State<AnnoncesScreen> {
                         horizontal: 16, vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: isActive
-                            ? cat['color'] as Color
-                            : AppColors.surface,
+                        // Actif = fond noir encre / Inactif = blanc
+                        color: isActive ? AppColors.ink : Colors.white,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isActive
-                              ? cat['color'] as Color
-                              : AppColors.divider,
-                          width: 0.5,
+                          color: isActive ? AppColors.ink : AppColors.hairlineStrong,
+                          width: 1.5,
                         ),
                       ),
                       child: Text(
                         cat['label'],
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: isActive
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                          fontWeight: isActive
-                              ? FontWeight.w600
-                              : FontWeight.w400,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isActive ? Colors.white : AppColors.ink,
                         ),
                       ),
                     ),
@@ -235,7 +303,7 @@ class _AnnoncesScreenState extends State<AnnoncesScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha:0.04),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -251,23 +319,25 @@ class _AnnoncesScreenState extends State<AnnoncesScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              // ── Ligne du haut : badges + date ─────────────────
+              // ── Ligne du haut : badge solide + date ───────────
               Row(
                 children: [
-                  // Badge catégorie
+                  // Badge solide — fond couleur, texte blanc, 4px radius
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 3,
+                      horizontal: 8, vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: couleur.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
+                      color: couleur,
+                      borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       annonce['categorie'].toString().toUpperCase(),
-                      style: AppTextStyles.fieldLabel.copyWith(
-                        color: couleur,
-                        fontSize: 9,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 1.2,
                       ),
                     ),
                   ),
@@ -280,7 +350,7 @@ class _AnnoncesScreenState extends State<AnnoncesScreen> {
                         horizontal: 8, vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.1),
+                        color: AppColors.error.withValues(alpha:0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -317,23 +387,27 @@ class _AnnoncesScreenState extends State<AnnoncesScreen> {
 
               const SizedBox(height: 10),
 
-              // ── Titre ─────────────────────────────────────────
+              // ── Titre Playfair 18px w700 ──────────────────────
               Text(
                 annonce['titre'],
-                style: AppTextStyles.bodyMedium.copyWith(
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  fontSize: 15,
+                  color: AppColors.ink,
+                  height: 1.2,
+                  letterSpacing: -0.2,
                 ),
               ),
 
               const SizedBox(height: 6),
 
-              // ── Aperçu contenu (2 lignes max) ─────────────────
+              // ── Aperçu contenu DM Sans 13px ───────────────────
               Text(
                 annonce['contenu'],
-                style: AppTextStyles.bodySmall.copyWith(
-                  height: 1.5,
-                  color: AppColors.textSecondary,
+                style: GoogleFonts.dmSans(
+                  fontSize: 13,
+                  color: AppColors.textBody,
+                  height: 1.45,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -395,6 +469,16 @@ class _AnnounceDetailScreen extends StatelessWidget {
     required this.dateRelative,
   });
 
+  Future<void> _partagerWhatsApp() async {
+    final titre = annonce['titre'] ?? '';
+    final contenu = annonce['contenu'] ?? '';
+    final texte = Uri.encodeComponent('📢 *$titre*\n\n$contenu\n\n— Paroisse Saint André');
+    final uri = Uri.parse('https://wa.me/?text=$texte');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -408,23 +492,52 @@ class _AnnounceDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Bouton retour
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Row(
-                        children: [
-                          Icon(Icons.arrow_back_rounded,
-                              size: 20, color: couleur),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Annonces',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: couleur,
-                              fontWeight: FontWeight.w600,
+                    // Bouton retour + partage WhatsApp
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.of(context).pop(),
+                          child: Row(
+                            children: [
+                              Icon(Icons.arrow_back_rounded, size: 20, color: couleur),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Annonces',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: couleur,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: _partagerWhatsApp,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF25D366).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFF25D366).withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.share_rounded, size: 15, color: Color(0xFF25D366)),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'WhatsApp',
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 12, fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF25D366),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 24),
@@ -437,7 +550,7 @@ class _AnnounceDetailScreen extends StatelessWidget {
                             horizontal: 12, vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: couleur.withOpacity(0.1),
+                            color: couleur.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -487,4 +600,23 @@ class _AnnounceDetailScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Clipper vague douce pour le bas du header rouge ──────────────────
+class _AnnoncesHeaderClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    const curveHeight = 22.0;
+    return Path()
+      ..lineTo(0, size.height - curveHeight)
+      ..quadraticBezierTo(
+        size.width / 2, size.height,
+        size.width, size.height - curveHeight,
+      )
+      ..lineTo(size.width, 0)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }

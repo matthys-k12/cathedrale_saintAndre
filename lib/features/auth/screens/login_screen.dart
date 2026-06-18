@@ -7,6 +7,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../cores/constants/app_colors.dart';
 import '../../../cores/constants/app_texts_styles.dart';
@@ -28,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _telephoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -56,6 +59,9 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('remember_me', _rememberMe);
+
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const MainNavigation()),
@@ -69,6 +75,83 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showMotDePasseOublie(BuildContext context) {
+    final phoneCtrl = TextEditingController();
+    bool sending = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          backgroundColor: AppColors.background,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Mot de passe oublié', style: AppTextStyles.heading2),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Entrez votre numéro de téléphone. Un lien de réinitialisation vous sera envoyé.',
+                style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary, height: 1.5),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  hintText: '07 00 00 00 00',
+                  hintStyle: AppTextStyles.inputHint,
+                  prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Annuler', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: sending
+                  ? null
+                  : () async {
+                      final phone = phoneCtrl.text.trim().replaceAll(RegExp(r'[\s\-\.]'), '');
+                      if (phone.isEmpty) return;
+                      setSt(() => sending = true);
+                      try {
+                        final email = 'user_$phone@gmail.com';
+                        await supabase.auth.resetPasswordForEmail(email);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        _showError('Si ce numéro existe, un lien a été envoyé. Contactez la paroisse si besoin.');
+                      } catch (_) {
+                        setSt(() => sending = false);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        _showError('Contactez l\'administration de la paroisse pour réinitialiser votre mot de passe.');
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                elevation: 0,
+              ),
+              child: sending
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Text('Envoyer', style: AppTextStyles.button),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showError(String message) {
@@ -97,15 +180,9 @@ class _LoginScreenState extends State<LoginScreen> {
             right: 0,
             // La photo occupe 42% de la hauteur de l'écran
             height: MediaQuery.of(context).size.height * 0.42,
-            child: Image.network(
-              // Image temporaire de cathédrale — remplace par ta vraie photo
-              'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?w=800',
+            child: Image.asset(
+              'assets/images/Vitrail calices.png',
               fit: BoxFit.cover,
-              // Placeholder bordeaux pendant le chargement
-              loadingBuilder: (_, child, progress) {
-                if (progress == null) return child;
-                return Container(color: AppColors.primary);
-              },
               errorBuilder: (_, __, ___) =>
                   Container(color: AppColors.primary),
             ),
@@ -138,9 +215,50 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Espace pour laisser respirer sous la photo
+                  // Logo centré sur le fond de la photo
                   SizedBox(
                     height: MediaQuery.of(context).size.height * 0.28,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.3),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: Image.asset(
+                                'assets/images/logo.jpeg',
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: AppColors.primary,
+                                  child: const Icon(Icons.church_rounded, color: Colors.white, size: 36),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Saint André',
+                            style: GoogleFonts.playfairDisplay(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
 
                   // ── Carte blanche avec le formulaire ──
@@ -160,16 +278,34 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Titre principal en serif bordeaux
+                            // Kicker paroisse — DM Sans rouge
                           Text(
-                            'Heureux de vous revoir',
-                            style: AppTextStyles.heading1,
+                            'SAINT ANDRÉ · YOPOUGON',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                              letterSpacing: 1.4,
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // Titre principal — Playfair Display serif
+                          Text(
+                            'Heureux de\nvous revoir.',
+                            style: GoogleFonts.playfairDisplay(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.ink,
+                              height: 1.15,
+                              letterSpacing: -0.5,
+                            ),
                           ),
 
                           const SizedBox(height: 20),
 
-                          // ── Citation avec barre bordeaux à gauche ──
-                          // Reproduit exactement le style de la maquette
+                          // ── Citation avec barre rouge à gauche — signature éditoriale
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
@@ -177,18 +313,23 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(10),
-                              // Barre bordeaux à gauche — l'élément signature
+                              borderRadius: BorderRadius.circular(8),
                               border: const Border(
                                 left: BorderSide(
-                                  color: AppColors.accent,
+                                  color: AppColors.primary,
                                   width: 3.5,
                                 ),
                               ),
                             ),
                             child: Text(
                               '"Que la paix du Seigneur soit toujours avec vous."',
-                              style: AppTextStyles.quote,
+                              style: GoogleFonts.playfairDisplay(
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textBody,
+                                height: 1.5,
+                              ),
                             ),
                           ),
 
@@ -229,26 +370,60 @@ class _LoginScreenState extends State<LoginScreen> {
                             },
                           ),
 
-                          // "Mot de passe oublié ?" aligné à droite
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                // TODO V2 : reset mot de passe par SMS
-                              },
-                              child: Text(
-                                'Mot de passe oublié ?',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w600,
+                          // "Se souvenir de moi" + "Mot de passe oublié ?" sur la même ligne
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              GestureDetector(
+                                onTap: () => setState(() => _rememberMe = !_rememberMe),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: Checkbox(
+                                        value: _rememberMe,
+                                        onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                                        activeColor: AppColors.primary,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        side: const BorderSide(color: AppColors.divider, width: 1.5),
+                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Se souvenir de moi',
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
+                              TextButton(
+                                onPressed: () => _showMotDePasseOublie(context),
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  'Mot de passe oublié ?',
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
 
                           const SizedBox(height: 8),
 
-                          // Bouton principal "SE CONNECTER"
+                          // Bouton principal "SE CONNECTER" — rouge pill
                           SizedBox(
                             width: double.infinity,
                             height: 54,
@@ -256,18 +431,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: _isLoading ? null : _handleLogin,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primary,
-                                foregroundColor: AppColors.textOnPrimary,
                                 disabledBackgroundColor:
-                                    AppColors.primary.withOpacity(0.6),
+                                    AppColors.primary.withOpacity(0.5),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(28),
                                 ),
                                 elevation: 0,
                               ),
                               child: _isLoading
                                   ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
+                                      width: 22, height: 22,
                                       child: CircularProgressIndicator(
                                         color: Colors.white,
                                         strokeWidth: 2.5,

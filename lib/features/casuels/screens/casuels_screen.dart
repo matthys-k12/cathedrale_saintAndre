@@ -268,12 +268,21 @@ class _CasuelsScreenState extends State<CasuelsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.arrow_back_rounded, size: 20, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text('Retour', style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
           Text('Paiement des casuels', style: AppTextStyles.heading2),
           const SizedBox(height: 4),
-          Text(
-            'Soutenez la vie sacramentelle de votre paroisse',
-            style: AppTextStyles.bodySmall,
-          ),
+          Text('Soutenez la vie sacramentelle de votre paroisse', style: AppTextStyles.bodySmall),
         ],
       ),
     );
@@ -653,19 +662,40 @@ class _CasuelsScreenState extends State<CasuelsScreen> {
 
           const SizedBox(width: 16),
 
-          // Bouton Continuer
+          // Bouton Continuer — désactivé si pour_tiers sans nom saisi
           Expanded(
-            child: ElevatedButton(
-              onPressed: _showPaiementSheet,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: Text('CONTINUER ›', style: AppTextStyles.button),
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _nomController,
+              builder: (context, value, _) {
+                final nomObligatoire = _typeDemandeur == 'pour_tiers'
+                    && value.text.trim().isEmpty;
+                return ElevatedButton(
+                  onPressed: nomObligatoire ? null : _showPaiementSheet,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    disabledBackgroundColor: AppColors.divider,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('CONTINUER ›', style: AppTextStyles.button),
+                      if (nomObligatoire)
+                        Text(
+                          'Saisissez le nom du bénéficiaire',
+                          style: AppTextStyles.button.copyWith(
+                            fontSize: 9,
+                            color: Colors.white.withOpacity(0.7),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ],

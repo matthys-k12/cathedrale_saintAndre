@@ -30,7 +30,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
-  int _currentStep = 0;
 
   @override
   void dispose() {
@@ -70,12 +69,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         throw Exception('Erreur lors de la création du compte');
       }
 
-      await supabase.from('profiles').insert({
-        'id': authResponse.user!.id,
-        'nom': nomPrenoms,
-        'prenoms': '',
-        'telephone': phone,
-      });
+      // Le trigger handle_new_user crée le profil automatiquement.
+      // Aucune opération manuelle sur profiles nécessaire.
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -116,10 +111,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           // ── COUCHE 1 : Background image cathédrale ─────────────────
           // Prend TOUT l'écran en fond
           Positioned.fill(
-            child: Image.network(
-              // Image temporaire de cathédrale en background
-              // En prod : remplace par Image.asset('assets/images/cathedrale_bg.jpg')
-              'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?w=800',
+            child: Image.asset(
+              'assets/images/Vitrail calices.png',
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) =>
                   Container(color: AppColors.primary),
@@ -251,26 +244,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
             const SizedBox(height: 20),
 
-            // ── Stepper 3 étapes ───────────────────────────────────
-            Row(
-              children: List.generate(3, (index) {
-                final isActive = index <= _currentStep;
-                return Expanded(
-                  child: Container(
-                    margin: EdgeInsets.only(right: index < 2 ? 8 : 0),
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? AppColors.primary
-                          : AppColors.divider,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                );
-              }),
-            ),
-
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
 
             // ── Champ Nom complet ──────────────────────────────────
             AuthTextField(
@@ -412,7 +386,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
             const SizedBox(height: 28),
 
-            // ── Bouton S'INSCRIRE ──────────────────────────────────
+            // ── Bouton S'INSCRIRE — rouge pill ────────────────────
             SizedBox(
               width: double.infinity,
               height: 54,
@@ -420,17 +394,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 onPressed: _isLoading ? null : _handleRegister,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  disabledBackgroundColor:
-                      AppColors.primary.withOpacity(0.6),
+                  disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(28),
                   ),
                   elevation: 0,
                 ),
                 child: _isLoading
                     ? const SizedBox(
-                        width: 22,
-                        height: 22,
+                        width: 22, height: 22,
                         child: CircularProgressIndicator(
                           color: Colors.white,
                           strokeWidth: 2.5,
@@ -441,7 +413,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         children: [
                           Text("S'INSCRIRE", style: AppTextStyles.button),
                           const SizedBox(width: 8),
-                          // Petite icône décorative comme dans la maquette
                           const Icon(
                             Icons.church,
                             color: Colors.white,

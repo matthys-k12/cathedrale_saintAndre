@@ -29,10 +29,38 @@ dependencies:
   # Pour le partage WhatsApp (ouvrir l'app WhatsApp)
   url_launcher: ^6.2.5
 
+  # Player audio natif Flutter — léger et performant
+  just_audio: ^0.9.36
+
+  # Stockage local clé-valeur — pour la date de dernière lecture des notifications
+  shared_preferences: ^2.3.2
+
+  # Partage natif (share sheet Android/iOS)
+  share_plus: ^10.0.0
+
+  # Sélection de photo depuis la galerie ou l'appareil photo
+  image_picker: ^1.1.2
+
+  # Player YouTube intégré — lecture in-app sans quitter l'application
+  youtube_player_flutter: ^9.0.2
+
+  # Player vidéo direct (fichiers MP4/MOV stockés dans Supabase storage)
+  video_player: ^2.8.7
+  chewie: ^1.8.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/logo.jpeg"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/logo.jpeg"
 
 flutter:
   uses-material-design: true

@@ -9,6 +9,7 @@
 
 import 'package:flutter/material.dart';
 import '../../../cores/constants/app_colors.dart';
+import '../../../cores/utils/text_utils.dart';
 import '../../../cores/constants/app_texts_styles.dart';
 import '../../../cores/supabase/supabase_client.dart';
 import 'actualite_detail_screen.dart';
@@ -23,20 +24,64 @@ class ActualitesScreen extends StatefulWidget {
 class _ActualitesScreenState extends State<ActualitesScreen> {
   List<Map<String, dynamic>> _actualites = [];
   bool _isLoading = true;
-  String _filtreActif = 'tout';
+  String _recherche = '';
+  bool _searchVisible = false;
+  final TextEditingController _searchCtrl = TextEditingController();
 
-  final List<Map<String, dynamic>> _categories = [
-    {'id': 'tout', 'label': 'Tout'},
-    {'id': 'vie_paroisse', 'label': 'Vie de la Paroisse'},
-    {'id': 'evenements', 'label': 'Événements'},
-    {'id': 'social', 'label': 'Social'},
-    {'id': 'liturgie', 'label': 'Liturgie'},
+  // Données de démonstration — affichées quand Supabase ne retourne rien
+  static const List<Map<String, dynamic>> _mockActualites = [
+    {
+      'id': 'mock_1',
+      'titre': 'La Cathédrale Saint André accueille le Jubilé diocésain',
+      'article': 'En ce temps fort de l\'année liturgique, la paroisse Saint André de Yopougon a eu l\'honneur d\'accueillir le jubilé diocésain. Plusieurs centaines de fidèles ont participé à cette célébration mémorable, présidée par Son Excellence l\'Archevêque du diocèse d\'Abidjan. Un moment de grâce et de communion pour toute la communauté.',
+      'categorie': 'vie_paroisse',
+      'est_a_la_une': true,
+      'created_at': '2026-05-24T10:00:00',
+      'video_url': null,
+      'actualite_photos': [],
+    },
+    {
+      'id': 'mock_2',
+      'titre': 'Remise de kits à 50 familles démunies',
+      'article': 'Dans le cadre de son action caritative, la paroisse Saint André a remis des kits alimentaires et scolaires à 50 familles défavorisées du quartier Yopougon. Une initiative saluée par toute la communauté et coordonnée par l\'équipe du Secours Catholique paroissial.',
+      'categorie': 'social',
+      'est_a_la_une': false,
+      'created_at': '2026-05-20T09:00:00',
+      'video_url': null,
+      'actualite_photos': [],
+    },
+    {
+      'id': 'mock_3',
+      'titre': 'Inauguration de la nouvelle salle de catéchèse',
+      'article': 'Après plusieurs mois de travaux, la nouvelle salle de catéchèse a été inaugurée par le curé de la paroisse. Cet espace moderne pourra accueillir jusqu\'à 80 enfants pour les cours de préparation aux sacrements. Une belle avancée pour la formation des jeunes paroissiens.',
+      'categorie': 'vie_paroisse',
+      'est_a_la_une': false,
+      'created_at': '2026-05-15T14:00:00',
+      'video_url': null,
+      'actualite_photos': [],
+    },
+    {
+      'id': 'mock_4',
+      'titre': 'Concert de louanges — Dimanche 8 juin',
+      'article': 'La chorale paroissiale "Voix de Lumière" organise un grand concert de louanges le dimanche 8 juin après la messe de 10h00. Tous les paroissiens et leurs familles sont chaleureusement invités à partager ce moment de prière et de joie.',
+      'categorie': 'evenements',
+      'est_a_la_une': false,
+      'created_at': '2026-05-10T11:00:00',
+      'video_url': null,
+      'actualite_photos': [],
+    },
   ];
 
   @override
   void initState() {
     super.initState();
     _loadActualites();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadActualites() async {
@@ -50,7 +95,13 @@ class _ActualitesScreenState extends State<ActualitesScreen> {
 
       if (mounted) {
         setState(() {
-          _actualites = List<Map<String, dynamic>>.from(data);
+          _actualites = List<Map<String, dynamic>>.from(data).map((a) {
+            return {
+              ...a,
+              'titre': nfc(a['titre']?.toString()),
+              'article': nfc(a['article']?.toString()),
+            };
+          }).toList();
           _isLoading = false;
         });
       }
@@ -59,19 +110,35 @@ class _ActualitesScreenState extends State<ActualitesScreen> {
     }
   }
 
+  // Données effectives : Supabase si disponible, sinon mock de démonstration
+  List<Map<String, dynamic>> get _actualitesEffectives =>
+      _actualites.isEmpty ? _mockActualites : _actualites;
+
+  Map<String, dynamic> _normalise(Map<String, dynamic> a) => {
+    ...a,
+    'titre': nfc(a['titre']?.toString()),
+    'article': nfc(a['article']?.toString()),
+  };
+
   List<Map<String, dynamic>> get _actualitesFiltrees {
-    if (_filtreActif == 'tout') return _actualites;
-    return _actualites
-        .where((a) => a['categorie'] == _filtreActif)
-        .toList();
+    final base = _actualitesEffectives.map(_normalise).toList();
+    if (_recherche.trim().isEmpty) return base;
+    final q = _recherche.trim().toLowerCase();
+    return base.where((a) {
+      final titre = (a['titre'] ?? '').toString().toLowerCase();
+      final article = (a['article'] ?? '').toString().toLowerCase();
+      return titre.contains(q) || article.contains(q);
+    }).toList();
   }
 
-  // Première photo d'une actualité
+  // Première photo d'une actualité — priorité à image_couverture
   String? _premierePhoto(Map<String, dynamic> actu) {
+    final couverture = actu['image_couverture'] as String?;
+    if (couverture != null && couverture.isNotEmpty) return couverture;
     final photos = actu['actualite_photos'] as List?;
     if (photos == null || photos.isEmpty) return null;
     final sorted = [...photos]
-      ..sort((a, b) => (a['ordre'] as int).compareTo(b['ordre'] as int));
+      ..sort((a, b) => (a['ordre'] as int? ?? 0).compareTo(b['ordre'] as int? ?? 0));
     return sorted.first['url'] as String?;
   }
 
@@ -114,99 +181,106 @@ class _ActualitesScreenState extends State<ActualitesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            // ── Header ───────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            // ── Header bloc vert solide — style éditorial ────────
+            Container(
+              color: AppColors.green,
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Avatar logo
+                  // Croix dans cercle blanc (38×38)
                   Container(
-                    width: 34, height: 34,
+                    width: 38,
+                    height: 38,
                     decoration: const BoxDecoration(
-                      color: AppColors.primary,
+                      color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: const Center(
-                      child: Text('SA',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                    child: Icon(
+                      Icons.church_rounded,
+                      color: AppColors.green,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Kicker + titre
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SAINT ANDRÉ',
+                        style: AppTextStyles.fieldLabel.copyWith(
+                          color: Colors.white.withValues(alpha: 0.85),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Saint André',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                      const SizedBox(height: 1),
+                      Text(
+                        'Actualités',
+                        style: AppTextStyles.heading2.copyWith(
+                          fontSize: 24,
+                          color: Colors.white,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ],
                   ),
                   const Spacer(),
-                  // Cloche
-                  const Icon(
-                    Icons.notifications_outlined,
-                    color: AppColors.primary,
-                    size: 22,
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _searchVisible = !_searchVisible;
+                      if (!_searchVisible) {
+                        _searchCtrl.clear();
+                        _recherche = '';
+                      }
+                    }),
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: _searchVisible
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Icon(
+                        _searchVisible ? Icons.close_rounded : Icons.search_rounded,
+                        color: _searchVisible ? AppColors.green : Colors.white,
+                        size: 20,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 16),
-
-            // ── Filtres catégories ────────────────────────────────
-            SizedBox(
-              height: 34,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _categories.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  final cat = _categories[i];
-                  final isActive = _filtreActif == cat['id'];
-                  return GestureDetector(
-                    onTap: () =>
-                        setState(() => _filtreActif = cat['id']),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isActive
-                            ? AppColors.primary
-                            : AppColors.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isActive
-                              ? AppColors.primary
-                              : AppColors.divider,
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Text(
-                        cat['label'],
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: isActive
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                          fontWeight: isActive
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                          fontSize: 12,
-                        ),
-                      ),
+            // Barre de recherche — apparaît quand loupe cliquée
+            if (_searchVisible)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: TextField(
+                  controller: _searchCtrl,
+                  autofocus: true,
+                  onChanged: (v) => setState(() => _recherche = v),
+                  style: AppTextStyles.inputText,
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher une actualité...',
+                    hintStyle: AppTextStyles.inputHint,
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textSecondary),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
-            ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // ── Liste des actualités ──────────────────────────────
             Expanded(

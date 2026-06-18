@@ -3,6 +3,7 @@
 // Quand l'utilisateur tape sur une icône en bas, on affiche l'écran correspondant.
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../cores/constants/app_colors.dart';
 import '../cores/constants/app_texts_styles.dart';
 import '../features/casuels/screens/casuels_screen.dart';
@@ -22,6 +23,42 @@ class MainNavigation extends StatefulWidget {
 
   @override
   State<MainNavigation> createState() => _MainNavigationState();
+}
+
+// Icône active avec point rouge positionné en absolu (top:-4, right:-6)
+// Stack évite que le dot prenne de la place dans le layout de la nav bar.
+class _ActiveIcon extends StatelessWidget {
+  final IconData icon;
+  const _ActiveIcon({required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 30,
+      height: 28,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Center(child: Icon(icon)),
+          // Dot rouge absolu — hors flux, ne pousse pas l'icône vers le bas
+          const Positioned(
+            top: -4,
+            right: -6,
+            child: SizedBox(
+              width: 6,
+              height: 6,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _MainNavigationState extends State<MainNavigation> {
@@ -71,32 +108,32 @@ class _MainNavigationState extends State<MainNavigation> {
           backgroundColor: Colors.white,
           selectedItemColor: AppColors.primary,
           unselectedItemColor: AppColors.textSecondary,
-          selectedLabelStyle: AppTextStyles.fieldLabel.copyWith(
-            color: AppColors.primary,
+          selectedLabelStyle: GoogleFonts.dmSans(
+            fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
-          unselectedLabelStyle: AppTextStyles.fieldLabel,
+          unselectedLabelStyle: GoogleFonts.dmSans(fontSize: 11),
           elevation: 0,
 
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home_rounded), // Icône pleine si actif
+              icon: const Icon(Icons.home_outlined),
+              activeIcon: _ActiveIcon(icon: Icons.home_rounded),
               label: 'Accueil',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.campaign_outlined),
-              activeIcon: Icon(Icons.campaign_rounded),
+              icon: const Icon(Icons.campaign_outlined),
+              activeIcon: _ActiveIcon(icon: Icons.campaign_rounded),
               label: 'Annonces',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.newspaper_outlined),
-              activeIcon: Icon(Icons.newspaper_rounded),
+              icon: const Icon(Icons.newspaper_outlined),
+              activeIcon: _ActiveIcon(icon: Icons.newspaper_rounded),
               label: 'Actualités',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline_rounded),
-              activeIcon: Icon(Icons.person_rounded),
+              icon: const Icon(Icons.person_outline_rounded),
+              activeIcon: _ActiveIcon(icon: Icons.person_rounded),
               label: 'Mon compte',
             ),
           ],

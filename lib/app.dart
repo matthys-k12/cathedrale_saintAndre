@@ -3,9 +3,11 @@
 // C'est ici qu'on décide si l'utilisateur voit le Login ou la Home.
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'cores/constants/app_colors.dart';
 import 'cores/supabase/supabase_client.dart';
 import 'features/auth/screens/login_screen.dart';
+import 'features/onboarding/screens/onboarding_screen.dart';
 import 'navigation/main_navigation.dart';
 
 class CathedralApp extends StatelessWidget {
@@ -14,13 +16,8 @@ class CathedralApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Saint André Yopougon',
-
-      // Cache le bandeau rouge "DEBUG" en haut à droite
+      title: 'Cathédrale St André',
       debugShowCheckedModeBanner: false,
-
-      // Thème global — définit les couleurs par défaut
-      // de tous les widgets Material (boutons, inputs, etc.)
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -28,32 +25,39 @@ class CathedralApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         scaffoldBackgroundColor: AppColors.background,
-
-        // Supprime l'élévation/ombre par défaut des AppBar
+        fontFamily: 'Roboto',
         appBarTheme: const AppBarTheme(
           backgroundColor: AppColors.background,
           elevation: 0,
           scrolledUnderElevation: 0,
         ),
       ),
-
-      // Écran de démarrage :
-      // Si une session Supabase existe → l'utilisateur est déjà connecté
-      // → on va directement sur la Home sans passer par le Login
-      home: _resolveStartScreen(),
+      home: FutureBuilder<Widget>(
+        future: _resolveStartScreen(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            // Écran blanc pendant le chargement de SharedPreferences (~50ms)
+            return const Scaffold(backgroundColor: Colors.white);
+          }
+          return snapshot.data!;
+        },
+      ),
     );
   }
 
-  Widget _resolveStartScreen() {
-    // currentSession est null si personne n'est connecté
+  static Future<Widget> _resolveStartScreen() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final seen = prefs.getBool('onboarding_seen') ?? false;
+    if (!seen) return const OnboardingScreen();
+
+    final rememberMe = prefs.getBool('remember_me') ?? false;
     final session = supabase.auth.currentSession;
 
-    if (session != null) {
-      // Session active → directement sur l'app
-      return const MainNavigation();
-    } else {
-      // Pas de session → écran de connexion
-      return const LoginScreen();
-    }
+    // Passer directement à l'app uniquement si l'utilisateur a coché
+    // "Se souvenir de moi" ET qu'une session Supabase est encore valide
+    if (rememberMe && session != null) return const MainNavigation();
+
+    return const LoginScreen();
   }
 }

@@ -1,183 +1,195 @@
-//Carousel d'évènements paroissiaux 
-//visibles sur la droite ppour inviter au scroll
-
+// Carousel d'événements — card héro éditorial :
+// fond sombre 240px, badge rouge solid, dégradé 0.15→0→0.75,
+// titre Playfair 26px w700, indicateurs pills animés.
+// Données chargées depuis Supabase (table carrousel_items, est_actif = true).
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../cores/constants/app_colors.dart';
-import '../../../cores/constants/app_texts_styles.dart';
-
-
-//Modèle de données pour un évènement du Carrousel
+import '../../../cores/supabase/supabase_client.dart';
 
 class CarouselEvent {
-  final String title;
-  final String badge ; //"EVENEMENT, ANNONCE"
+  final String titre;
+  final String? sousTitre;
   final String imageUrl;
 
   const CarouselEvent({
-    required this.title,
-    required this.badge,
-    required this.imageUrl
+    required this.titre,
+    this.sousTitre,
+    required this.imageUrl,
   });
+
+  factory CarouselEvent.fromJson(Map<String, dynamic> json) {
+    return CarouselEvent(
+      titre: json['titre'] as String? ?? '',
+      sousTitre: json['sous_titre'] as String?,
+      imageUrl: json['image_url'] as String? ?? '',
+    );
+  }
 }
 
 class EventCarousel extends StatefulWidget {
-  const EventCarousel ({super.key});
+  const EventCarousel({super.key});
 
   @override
   State<EventCarousel> createState() => _EventCarouselState();
-
 }
 
 class _EventCarouselState extends State<EventCarousel> {
-  // controleur pour tracker la page active 
-  final PageController _pageController = PageController(
-    // viewportFraction < 1 → la card suivante est partiellement visible
-    // C'est ce qui crée l'effet "peek" visible dans la maquette
-
-    viewportFraction: 0.88,
-  );
-
+  final PageController _pageController = PageController(viewportFraction: 0.92);
   int _currentPage = 0;
-
-  //Données fictives pour le prototype - en prod, elles viennent de supabase
-
-  final List<CarouselEvent> _events = const [
-    CarouselEvent(title: 'Kermesse Paroissiale', badge: 'EVENEMENT', imageUrl: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=600',),
-    CarouselEvent(
-      title: 'Retraite de Carême',
-      badge: 'ANNONCE',
-      imageUrl:
-          'https://images.unsplash.com/photo-1548625149-fc4a29cf7092?w=600',
-    ),
-    CarouselEvent(
-      title: 'Célébration de Pâques',
-      badge: 'ÉVÉNEMENT',
-      imageUrl:
-          'https://images.unsplash.com/photo-1604537466158-719b1972feb8?w=600',
-    ),
-  ];
+  List<CarouselEvent> _events = [];
+  bool _loading = true;
 
   @override
-  Widget build (BuildContext context) {
+  void initState() {
+    super.initState();
+    _loadSlides();
+  }
+
+  Future<void> _loadSlides() async {
+    try {
+      final data = await supabase
+          .from('carrousel_items')
+          .select('titre, sous_titre, image_url')
+          .eq('est_actif', true)
+          .order('ordre', ascending: true);
+
+      if (mounted) {
+        setState(() {
+          _events = (data as List)
+              .map((e) => CarouselEvent.fromJson(e as Map<String, dynamic>))
+              .toList();
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return SizedBox(
+        height: 240,
+        child: PageView.builder(
+          itemCount: 1,
+          itemBuilder: (_, __) => Container(
+            margin: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: AppColors.ink.withValues(alpha: 0.15),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_events.isEmpty) return const SizedBox.shrink();
+
     return Column(
       children: [
-        // carousel cards
         SizedBox(
-          height: 160,
+          height: 240,
           child: PageView.builder(
             controller: _pageController,
             itemCount: _events.length,
-            onPageChanged: (index) {
-              setState(() => _currentPage = index);
-            },
-            itemBuilder: (context, index){
-              return _buildEventCard(_events[index]);
-            },
+            onPageChanged: (index) => setState(() => _currentPage = index),
+            itemBuilder: (_, index) => _buildHeroCard(_events[index]),
           ),
         ),
 
-        const SizedBox(height: 12),
-
-
-        //indicateurs de pages (petits points )
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_events.length, (index) {
-            final isActive = index == _currentPage;
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              margin : const EdgeInsets.symmetric(horizontal: 3),
-              width: isActive ? 20 : 6, //le point actif s'élargit
-              height: 6,
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.primary : AppColors.divider,
-                borderRadius: BorderRadius.circular(3)
-              ), 
-            );
-          }),
-        )
+        if (_events.length > 1) ...[
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_events.length, (i) {
+              final isActive = i == _currentPage;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: isActive ? 20 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: isActive ? AppColors.primary : AppColors.divider,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              );
+            }),
+          ),
+        ],
       ],
     );
   }
 
-  //Construction d'une carte d'un évènement
-  Widget _buildEventCard(CarouselEvent event) {
+  Widget _buildHeroCard(CarouselEvent event) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        // Image en fond de la card
-        image: DecorationImage(
-          image: NetworkImage(event.imageUrl),
-          fit: BoxFit.cover,
-          // Placeholder en cas d'erreur réseau
-          onError: (_, __) {},
-        ),
-        color: AppColors.primary, // Couleur de fallback
+        borderRadius: BorderRadius.circular(14),
+        color: AppColors.ink,
+        image: event.imageUrl.isNotEmpty
+            ? DecorationImage(
+                image: NetworkImage(event.imageUrl),
+                fit: BoxFit.cover,
+                onError: (_, __) {},
+              )
+            : null,
       ),
       child: Stack(
         children: [
-          // Overlay dégradé du bas — rend le texte lisible sur l'image
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
+                    Colors.black.withValues(alpha: 0.15),
                     Colors.transparent,
-                    Colors.black.withOpacity(0.65),
+                    Colors.black.withValues(alpha: 0.75),
                   ],
-                  stops: const [0.4, 1.0],
+                  stops: const [0.0, 0.30, 1.0],
                 ),
               ),
             ),
           ),
 
-          // Contenu de la card
-          Padding(
-            padding: const EdgeInsets.all(16),
+          Positioned(
+            left: 18,
+            right: 18,
+            bottom: 18,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Badge en haut à gauche — "ÉVÉNEMENT"
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    // Fond semi-transparent blanc
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.4),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Text(
-                    event.badge,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 10,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ),
-
-                // Pousse le titre vers le bas
-                const Spacer(),
-
-                // Titre de l'événement en bas
                 Text(
-                  event.title,
-                  style: AppTextStyles.heading2.copyWith(
+                  event.titre,
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
                     color: Colors.white,
+                    height: 1.1,
+                    letterSpacing: -0.3,
                   ),
                 ),
+                if (event.sousTitre != null && event.sousTitre!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    event.sousTitre!,
+                    style: GoogleFonts.dmSans(
+                      fontSize: 13,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
