@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../cores/constants/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../cores/constants/app_colors.dart';
@@ -1046,14 +1047,15 @@ class _AccountScreenState extends State<AccountScreen> {
         Share.share(
           '✝ Cathédrale Saint André de Yopougon\n'
           '━━━━━━━━━━━━━━━━━━━━\n\n'
-          'Je vous invite à rejoindre notre communauté paroissiale sur l\'application officielle 🙏\n\n'
+          'Je vous invite à rejoindre notre communauté paroissiale 🙏\n\n'
           '📅 Horaires des messes & intentions\n'
           '📖 Texte & saint du jour\n'
-          '📢 Annonces et actualités de la paroisse\n'
+          '📢 Annonces et actualités\n'
           '🎙️ Podcasts et homélies\n'
           '💝 Dons & denier du culte\n'
-          '⛪ Casuel & demandes de sacrements\n\n'
-          'Disponible gratuitement sur Android.\n\n'
+          '⛪ Casuel & sacrements\n\n'
+          '📲 En savoir plus & télécharger l\'app :\n'
+          '$partageApp\n\n'
           '━━━━━━━━━━━━━━━━━━━━\n'
           '🕊️ « Là où deux ou trois sont réunis en mon nom, je suis au milieu d\'eux. » — Mt 18,20',
           subject: '✝ Rejoins notre communauté — App Cathédrale St André',

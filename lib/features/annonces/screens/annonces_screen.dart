@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../cores/constants/app_colors.dart';
+import '../../../cores/constants/app_config.dart';
 import '../../../cores/constants/app_texts_styles.dart';
 import '../../../cores/supabase/supabase_client.dart';
 import '../../notifications/screens/notifications_screen.dart';
@@ -470,8 +471,8 @@ class _AnnounceDetailScreen extends StatelessWidget {
   });
 
   Future<void> _partagerWhatsApp() async {
+    final id    = annonce['id']?.toString() ?? '';
     final titre = annonce['titre'] ?? '';
-    final contenu = annonce['contenu'] ?? '';
     final urgent = annonce['est_urgent'] == true ? '🚨 URGENT\n\n' : '';
 
     final sb = StringBuffer();
@@ -479,10 +480,11 @@ class _AnnounceDetailScreen extends StatelessWidget {
     sb.writeln('━━━━━━━━━━━━━━━━━━━━');
     sb.writeln();
     sb.write(urgent);
-    sb.writeln(contenu);
+    sb.writeln('📲 Lire l\'annonce complète :');
+    sb.writeln(id.isNotEmpty ? partageAnnonce(id) : partageApp);
     sb.writeln();
     sb.writeln('━━━━━━━━━━━━━━━━━━━━');
-    sb.writeln('📱 Annonce de la Cathédrale St André · Yopougon');
+    sb.write('📱 Cathédrale St André · Yopougon');
 
     await Share.share(sb.toString(), subject: titre);
   }

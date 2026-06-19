@@ -61,8 +61,7 @@ class _SaintJourScreenState extends State<SaintJourScreen> {
     sb.writeln(partageSaintJour);
     sb.writeln();
     sb.writeln('━━━━━━━━━━━━━━━━━━━━');
-    sb.writeln('📱 Cathédrale St André · Yopougon');
-    sb.write('(L\'app doit être installée pour ouvrir le lien)');
+    sb.write('📱 Cathédrale St André · Yopougon');
 
     await Share.share(
       sb.toString(),
