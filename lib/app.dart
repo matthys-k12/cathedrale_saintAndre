@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'cores/constants/app_colors.dart';
+import 'cores/navigation/deep_link_service.dart';
 import 'cores/supabase/supabase_client.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/onboarding/screens/onboarding_screen.dart';
@@ -18,6 +19,7 @@ class CathedralApp extends StatelessWidget {
     return MaterialApp(
       title: 'Cathédrale St André',
       debugShowCheckedModeBanner: false,
+      navigatorKey: appNavigatorKey,
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -52,11 +54,16 @@ class CathedralApp extends StatelessWidget {
     if (!seen) return const OnboardingScreen();
 
     final rememberMe = prefs.getBool('remember_me') ?? false;
-    final session = supabase.auth.currentSession;
-
-    // Passer directement à l'app uniquement si l'utilisateur a coché
-    // "Se souvenir de moi" ET qu'une session Supabase est encore valide
-    if (rememberMe && session != null) return const MainNavigation();
+    if (rememberMe) {
+      try {
+        // refreshSession() recharge la session depuis le stockage local,
+        // et renouvelle via le refresh token si l'access token a expiré
+        final res = await supabase.auth.refreshSession();
+        if (res.session != null) return const MainNavigation();
+      } catch (_) {
+        // Session expirée ou réseau indisponible → retour login
+      }
+    }
 
     return const LoginScreen();
   }

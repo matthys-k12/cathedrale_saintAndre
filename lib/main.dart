@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
+import 'cores/navigation/deep_link_service.dart';
 import 'cores/supabase/supabase_client.dart';
 
 void main() async {
@@ -23,6 +24,9 @@ void main() async {
 
   // Initialiser Supabase avant de lancer l'interface
   await SupabaseConfig.initialize();
+
+  // Démarrer le service de deep links (saintandre://)
+  DeepLinkService.init();
 
   // ProviderScope est le conteneur global de Riverpod
   // Il doit envelopper TOUTE l'app

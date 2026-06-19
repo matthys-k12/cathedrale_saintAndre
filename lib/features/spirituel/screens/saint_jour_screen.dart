@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../cores/constants/app_colors.dart';
+import '../../../cores/constants/app_config.dart';
 import '../../../cores/constants/app_texts_styles.dart';
 import '../../../cores/supabase/supabase_client.dart';
 
@@ -44,15 +45,29 @@ class _SaintJourScreenState extends State<SaintJourScreen> {
 
   Future<void> _partagerWhatsApp() async {
     if (_saint == null) return;
-    final texte = Uri.encodeComponent(
-      '🙏 Saint du jour — ${_saint!['nom']}\n\n'
-      '"${_saint!['citation'] ?? ''}"\n\n'
-      'Application Saint André Yopougon',
-    );
-    final url = Uri.parse('https://wa.me/?text=$texte');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+
+    final sb = StringBuffer();
+    sb.writeln('✝ SAINT DU JOUR · ${_formatDate(_saint!['fete_date']).toUpperCase()}');
+    sb.writeln('━━━━━━━━━━━━━━━━━━━━');
+    sb.writeln();
+    sb.writeln('🌟 ${_saint!['nom']}');
+    if (_saint!['sous_titre'] != null) sb.writeln(_saint!['sous_titre']);
+    sb.writeln();
+    if (_saint!['citation'] != null) {
+      sb.writeln('💬 « ${_saint!['citation']} »');
+      sb.writeln();
     }
+    sb.writeln('📲 Lire la biographie complète :');
+    sb.writeln(partageSaintJour);
+    sb.writeln();
+    sb.writeln('━━━━━━━━━━━━━━━━━━━━');
+    sb.writeln('📱 Cathédrale St André · Yopougon');
+    sb.write('(L\'app doit être installée pour ouvrir le lien)');
+
+    await Share.share(
+      sb.toString(),
+      subject: 'Saint du jour — ${_saint!['nom']}',
+    );
   }
 
   String _formatDate(String? dateStr) {

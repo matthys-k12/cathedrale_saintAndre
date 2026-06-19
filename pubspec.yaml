@@ -48,6 +48,15 @@ dependencies:
   video_player: ^2.8.7
   chewie: ^1.8.5
 
+  # Deep links — intercepte les liens saintandre:// pour naviguer dans l'app
+  app_links: ^6.4.1
+
+  # Téléchargement d'images réseau (pour sauvegarder photos en galerie)
+  http: ^1.2.2
+
+  # Enregistrement d'images dans la galerie Android/iOS (API moderne)
+  gal: ^1.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

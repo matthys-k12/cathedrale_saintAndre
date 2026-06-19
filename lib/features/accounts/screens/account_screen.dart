@@ -1044,9 +1044,19 @@ class _AccountScreenState extends State<AccountScreen> {
     return GestureDetector(
       onTap: () {
         Share.share(
-          'Découvrez l\'application de la Paroisse Saint André de Yopougon 🙏\n\n'
-          'Restez connecté à votre communauté : messes, annonces, actualités, dons et bien plus.',
-          subject: 'Application Saint André Yopougon',
+          '✝ Cathédrale Saint André de Yopougon\n'
+          '━━━━━━━━━━━━━━━━━━━━\n\n'
+          'Je vous invite à rejoindre notre communauté paroissiale sur l\'application officielle 🙏\n\n'
+          '📅 Horaires des messes & intentions\n'
+          '📖 Texte & saint du jour\n'
+          '📢 Annonces et actualités de la paroisse\n'
+          '🎙️ Podcasts et homélies\n'
+          '💝 Dons & denier du culte\n'
+          '⛪ Casuel & demandes de sacrements\n\n'
+          'Disponible gratuitement sur Android.\n\n'
+          '━━━━━━━━━━━━━━━━━━━━\n'
+          '🕊️ « Là où deux ou trois sont réunis en mon nom, je suis au milieu d\'eux. » — Mt 18,20',
+          subject: '✝ Rejoins notre communauté — App Cathédrale St André',
         );
       },
       child: Container(

@@ -6,8 +6,9 @@
 // - Bouton partage
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../cores/constants/app_colors.dart';
+import '../../../cores/constants/app_config.dart';
 import '../../../cores/constants/app_texts_styles.dart';
 import '../../../cores/supabase/supabase_client.dart';
 
@@ -74,15 +75,29 @@ class _TexteJourScreenState extends State<TexteJourScreen> {
 
   Future<void> _partagerWhatsApp() async {
     if (_texte == null) return;
-    final texte = Uri.encodeComponent(
-      '📖 Texte du jour — ${_texte!['reference']}\n\n'
-      '"${_texte!['evangile'] ?? _texte!['contenu'].toString().substring(0, 100)}..."\n\n'
-      'Application Saint André Yopougon',
-    );
-    final url = Uri.parse('https://wa.me/?text=$texte');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+
+    final sb = StringBuffer();
+    sb.writeln('📖 TEXTE DU JOUR · ${_formatDateFr(_texte!['date_lecture']).toUpperCase()}');
+    sb.writeln('━━━━━━━━━━━━━━━━━━━━');
+    sb.writeln();
+    sb.writeln('📚 ${_texte!['titre']}');
+    sb.writeln('Référence : ${_texte!['reference']}');
+    sb.writeln();
+    if (_texte!['evangile'] != null) {
+      sb.writeln('🙏 « ${_texte!['evangile']} »');
+      sb.writeln();
     }
+    sb.writeln('📲 Lire la lecture complète :');
+    sb.writeln(partageTexteJour);
+    sb.writeln();
+    sb.writeln('━━━━━━━━━━━━━━━━━━━━');
+    sb.writeln('📱 Cathédrale St André · Yopougon');
+    sb.write('(L\'app doit être installée pour ouvrir le lien)');
+
+    await Share.share(
+      sb.toString(),
+      subject: 'Texte du jour — ${_texte!['reference']}',
+    );
   }
 
   @override
