@@ -413,7 +413,6 @@ class _ActualiteDetailScreenState extends State<ActualiteDetailScreen> {
                         itemBuilder: (_, i) {
                           return GestureDetector(
                             onTap: () => _ouvrirPhoto(i),
-                            onLongPress: () => _menuPhoto(context, _photos[i], i),
                             child: Stack(
                               children: [
                                 Container(
@@ -447,19 +446,22 @@ class _ActualiteDetailScreenState extends State<ActualiteDetailScreen> {
                                     ),
                                   ),
                                 ),
-                                // Indicateur "appui long"
+                                // Bouton menu (tap direct — remplace long press qui bloquait le scroll)
                                 Positioned(
-                                  top: 6, right: 6,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.4),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.more_vert,
-                                      color: Colors.white,
-                                      size: 12,
+                                  top: 4, right: 4,
+                                  child: GestureDetector(
+                                    onTap: () => _menuPhoto(context, _photos[i], i),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(alpha: 0.4),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.more_vert,
+                                        color: Colors.white,
+                                        size: 12,
+                                      ),
                                     ),
                                   ),
                                 ),
