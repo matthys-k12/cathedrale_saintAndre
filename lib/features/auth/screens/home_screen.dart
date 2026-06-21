@@ -256,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Paroisse Saint André · Yopougon',
+            'Paroisse St André - Diocèse de Yopougon',
             style: GoogleFonts.dmSans(
               fontSize: 12,
               color: Colors.white.withValues(alpha:0.7),

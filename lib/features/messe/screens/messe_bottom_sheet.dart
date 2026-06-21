@@ -615,33 +615,7 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
     return now.isAfter(messeDt.subtract(Duration(minutes: delai)));
   }
 
-  bool get _isPrefixed =>
-      _typeMesse == 'action_de_grace' ||
-      _typeMesse == 'assistance_protection' ||
-      _typeMesse == 'repos_ame';
-
-  String get _prefixLabel {
-    switch (_typeMesse) {
-      case 'action_de_grace':       return "Messe d'action de grâce pour ";
-      case 'assistance_protection': return "Aide, assistance et protection pour ";
-      case 'repos_ame':             return "Repos de l'âme de ";
-      default:                      return '';
-    }
-  }
-
-  String get _hintSuffix {
-    if (_typeMesse == 'repos_ame') return 'nom du défunt…';
-    return 'prénom(s) ou nom…';
-  }
-
-  String get _fullIntention {
-    if (_isPrefixed) {
-      final suffix = _intentionSuffixController.text.trim();
-      if (suffix.isEmpty) return '';
-      return '$_prefixLabel$suffix';
-    }
-    return _intentionController.text.trim();
-  }
+  String get _fullIntention => _intentionController.text.trim();
 
   @override
   Widget build(BuildContext context) {
@@ -712,61 +686,29 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
           ],
         ),
         const SizedBox(height: 8),
-        if (_isPrefixed)
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
+        TextField(
+          controller: _intentionController,
+          maxLines: 6,
+          style: AppTextStyles.inputText,
+          decoration: InputDecoration(
+            hintText: 'Écrivez ici le nom ou l\'intention particulière...',
+            hintStyle: AppTextStyles.inputHint,
+            filled: true,
+            fillColor: AppColors.surface,
+            border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _prefixLabel,
-                  style: AppTextStyles.inputText.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                TextField(
-                  controller: _intentionSuffixController,
-                  style: AppTextStyles.inputText,
-                  decoration: InputDecoration(
-                    hintText: _hintSuffix,
-                    hintStyle: AppTextStyles.inputHint,
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 6),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          TextField(
-            controller: _intentionController,
-            maxLines: 4,
-            style: AppTextStyles.inputText,
-            decoration: InputDecoration(
-              hintText: 'Écrivez ici le nom ou l\'intention particulière...',
-              hintStyle: AppTextStyles.inputHint,
-              filled: true,
-              fillColor: AppColors.surface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(
+                color: AppColors.primary,
+                width: 1.5,
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                  color: AppColors.primary,
-                  width: 1.5,
-                ),
-              ),
-              contentPadding: const EdgeInsets.all(16),
             ),
+            contentPadding: const EdgeInsets.all(16),
           ),
+        ),
 
         const SizedBox(height: 32),
 
@@ -825,95 +767,66 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
     );
   }
 
-  // ── Calendrier horizontal (7 jours visibles) ──────────────────────
+  // ── Sélecteur de date (calendrier Material) ───────────────────────
   Widget _buildCalendar() {
-    // Générer 14 jours à partir d'aujourd'hui
-    final jours = List.generate(14, (i) {
-      return DateTime.now().add(Duration(days: i));
-    });
+    const mois = [
+      'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+      'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+    ];
+    const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+    final label =
+        '${jours[_selectedDate.weekday - 1]} ${_selectedDate.day} ${mois[_selectedDate.month - 1]} ${_selectedDate.year}';
 
-    // Noms des jours en français abrégés
-    const nomsJours = ['LU', 'MA', 'ME', 'JE', 'VE', 'SA', 'DI'];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Mois et année + flèches navigation
-        Row(
-          children: [
-            Text(
-              _formatMoisAnnee(_selectedDate),
-              style: AppTextStyles.bodyMedium.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: _selectedDate,
+          firstDate: DateTime.now(),
+          lastDate: DateTime.now().add(const Duration(days: 90)),
+          builder: (ctx, child) => Theme(
+            data: Theme.of(ctx).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: AppColors.primary,
+                onPrimary: Colors.white,
+                surface: Colors.white,
               ),
             ),
+            child: child!,
+          ),
+        );
+        if (picked != null) {
+          setState(() => _selectedDate = picked);
+          _applyFallbackHoraires(picked);
+          _loadHoraires(picked);
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.primary, width: 1.5),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.calendar_today_rounded,
+                size: 18, color: AppColors.primary),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            const Icon(Icons.keyboard_arrow_down_rounded,
+                color: AppColors.textSecondary),
           ],
         ),
-
-        const SizedBox(height: 12),
-
-        // Row des jours horizontalement scrollable
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: jours.map((jour) {
-              final isSelected = jour.year == _selectedDate.year &&
-                  jour.month == _selectedDate.month &&
-                  jour.day == _selectedDate.day;
-
-              // Index du jour dans la semaine (0=Lundi, 6=Dimanche)
-              final nomJour = nomsJours[jour.weekday - 1];
-
-              return GestureDetector(
-                onTap: () {
-                  setState(() => _selectedDate = jour);
-                  // Appliquer le fallback immédiatement puis charger Supabase
-                  _applyFallbackHoraires(jour);
-                  _loadHoraires(jour);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.only(right: 8),
-                  width: 44,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Nom du jour (LU, MA...)
-                      Text(
-                        nomJour,
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: isSelected
-                              ? Colors.white.withOpacity(0.8)
-                              : AppColors.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Numéro du jour
-                      Text(
-                        '${jour.day}',
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -926,10 +839,19 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
       );
     }
 
+    // Tri chronologique (HH:MM)
+    final heures = [..._horairesDisponibles]..sort((a, b) {
+        final aParts = a.split(':');
+        final bParts = b.split(':');
+        final aMin = int.parse(aParts[0]) * 60 + int.parse(aParts[1]);
+        final bMin = int.parse(bParts[0]) * 60 + int.parse(bParts[1]);
+        return aMin.compareTo(bMin);
+      });
+
     return Wrap(
       spacing: 10,
       runSpacing: 10,
-      children: _horairesDisponibles.map((heure) {
+      children: heures.map((heure) {
         final isSelected = heure == _selectedHeure;
         final isGrise = _isGrise(heure);
         return GestureDetector(
@@ -963,14 +885,6 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
     );
   }
 
-  // Formater "Octobre 2024" depuis une DateTime
-  String _formatMoisAnnee(DateTime date) {
-    const mois = [
-      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
-    ];
-    return '${mois[date.month - 1]} ${date.year}';
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────

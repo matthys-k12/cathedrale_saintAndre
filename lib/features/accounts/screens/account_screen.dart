@@ -1410,28 +1410,6 @@ class _ParametresScreenState extends State<_ParametresScreen> {
                           ),
                         ),
                       ),
-                      _ParamItem(
-                        icon: Icons.lightbulb_outline_rounded,
-                        label: 'Faire une suggestion',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const _ContactScreen(
-                              typePredefini: 'suggestion',
-                            ),
-                          ),
-                        ),
-                      ),
-                      _ParamItem(
-                        icon: Icons.bug_report_outlined,
-                        label: 'Signaler un bug',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const _ContactScreen(
-                              typePredefini: 'bug',
-                            ),
-                          ),
-                        ),
-                      ),
                     ]),
                   ],
                 ),
@@ -1643,13 +1621,35 @@ class _ParametresScreenState extends State<_ParametresScreen> {
     );
   }
 
-  void _ouvrirDocument(String type) {
+  Future<void> _ouvrirDocument(String type) async {
     final titres = {
-      'CGU': 'Conditions Générales d\'Utilisation',
-      'CGV': 'Conditions Générales de Vente',
+      'CGU':             'Conditions Générales d\'Utilisation',
+      'CGV':             'Conditions Générales de Vente',
       'confidentialite': 'Politique de confidentialité',
-      'mentions': 'Mentions légales',
+      'mentions':        'Mentions légales',
     };
+    final cleSupabase = {
+      'CGU':             'conditions_utilisation',
+      'CGV':             'conditions_vente',
+      'confidentialite': 'politique_confidentialite',
+      'mentions':        'mentions_legales',
+    };
+
+    String? contenu;
+    try {
+      final cle = cleSupabase[type];
+      if (cle != null) {
+        final rows = await supabase
+            .from('app_config')
+            .select('valeur')
+            .eq('cle', cle)
+            .limit(1);
+        if (rows.isNotEmpty) contenu = rows.first['valeur'] as String?;
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1679,7 +1679,9 @@ class _ParametresScreenState extends State<_ParametresScreen> {
               Text(titres[type] ?? '', style: AppTextStyles.heading2),
               const SizedBox(height: 16),
               Text(
-                'Ce document sera fourni par la Cathédrale Saint André de Yopougon.',
+                (contenu != null && contenu.trim().isNotEmpty)
+                    ? contenu
+                    : 'Ce document n\'est pas encore disponible.',
                 style: AppTextStyles.bodyLarge.copyWith(height: 1.8),
               ),
             ],
@@ -2039,56 +2041,52 @@ class _HistoriqueCompletScreenState extends State<_HistoriqueCompletScreen> {
 
 // ── Écran Nous contacter / Suggestions ────────────────────────────────
 class _ContactScreen extends StatefulWidget {
-  final String? typePredefini;
-  const _ContactScreen({this.typePredefini});
+  const _ContactScreen();
 
   @override
   State<_ContactScreen> createState() => _ContactScreenState();
 }
 
 class _ContactScreenState extends State<_ContactScreen> {
-  final _objetCtrl = TextEditingController();
   final _messageCtrl = TextEditingController();
-  late String _type;
+  String _objet = 'demande_info';
   bool _isLoading = false;
 
-  static const _types = [
-    {'value': 'suggestion', 'label': 'Suggestion'},
-    {'value': 'reclamation', 'label': 'Réclamation'},
-    {'value': 'bug', 'label': 'Signalement de bug'},
-    {'value': 'autre', 'label': 'Autre'},
+  static const _objets = [
+    {'value': 'demande_info',  'label': 'Demande d\'informations'},
+    {'value': 'suggestion',    'label': 'Suggestion'},
+    {'value': 'reclamation',   'label': 'Réclamation'},
   ];
 
   @override
   void initState() {
     super.initState();
-    _type = widget.typePredefini ?? 'suggestion';
   }
 
   @override
   void dispose() {
-    _objetCtrl.dispose();
     _messageCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _envoyer() async {
-    if (_objetCtrl.text.trim().isEmpty || _messageCtrl.text.trim().isEmpty) {
+    if (_messageCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Veuillez remplir l\'objet et le message'),
+          content: Text('Veuillez écrire votre message'),
           backgroundColor: AppColors.error,
         ),
       );
       return;
     }
     setState(() => _isLoading = true);
+    final labelObjet = _objets.firstWhere((o) => o['value'] == _objet)['label']!;
     try {
       final userId = supabase.auth.currentUser?.id;
       await supabase.from('contact_messages').insert({
         'user_id': userId,
-        'type': _type,
-        'objet': _objetCtrl.text.trim(),
+        'type': _objet,
+        'objet': labelObjet,
         'message': _messageCtrl.text.trim(),
         'est_lu': false,
       });
@@ -2171,8 +2169,8 @@ class _ContactScreenState extends State<_ContactScreen> {
                     ),
                     const SizedBox(height: 28),
 
-                    // Type
-                    Text('Type de message', style: AppTextStyles.fieldLabel),
+                    // Objet (dropdown)
+                    Text('Objet', style: AppTextStyles.fieldLabel),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2182,35 +2180,16 @@ class _ContactScreenState extends State<_ContactScreen> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: _type,
+                          value: _objet,
                           isExpanded: true,
                           style: AppTextStyles.inputText,
                           icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
-                          items: _types.map((t) => DropdownMenuItem(
-                            value: t['value'],
-                            child: Text(t['label']!),
+                          items: _objets.map((o) => DropdownMenuItem(
+                            value: o['value'],
+                            child: Text(o['label']!),
                           )).toList(),
-                          onChanged: (v) { if (v != null) setState(() => _type = v); },
+                          onChanged: (v) { if (v != null) setState(() => _objet = v); },
                         ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Objet
-                    Text('Objet', style: AppTextStyles.fieldLabel),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _objetCtrl,
-                      style: AppTextStyles.inputText,
-                      decoration: InputDecoration(
-                        hintText: 'Résumez en quelques mots…',
-                        hintStyle: AppTextStyles.inputHint,
-                        filled: true,
-                        fillColor: AppColors.surface,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
-                        contentPadding: const EdgeInsets.all(16),
                       ),
                     ),
 
@@ -2275,16 +2254,72 @@ class _ChangementMdpSheet extends StatefulWidget {
 }
 
 class _ChangementMdpSheetState extends State<_ChangementMdpSheet> {
-  final _newMdpController = TextEditingController();
-  final _confirmMdpController = TextEditingController();
+  final _ancienCtrl  = TextEditingController();
+  final _newCtrl     = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  bool _obscure0 = true;
   bool _obscure1 = true;
   bool _obscure2 = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    _newMdpController.dispose();
-    _confirmMdpController.dispose();
+    _ancienCtrl.dispose();
+    _newCtrl.dispose();
+    _confirmCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _valider() async {
+    final ancien  = _ancienCtrl.text.trim();
+    final nouveau = _newCtrl.text.trim();
+    final confirm = _confirmCtrl.text.trim();
+
+    if (ancien.isEmpty || nouveau.isEmpty || confirm.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Veuillez remplir tous les champs'),
+        backgroundColor: AppColors.error,
+      ));
+      return;
+    }
+    if (nouveau != confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Les nouveaux mots de passe ne correspondent pas'),
+        backgroundColor: AppColors.error,
+      ));
+      return;
+    }
+    if (nouveau.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Le nouveau mot de passe doit faire au moins 6 caractères'),
+        backgroundColor: AppColors.error,
+      ));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      // Vérifier l'ancien mot de passe via re-authentification
+      final email = supabase.auth.currentUser?.email ?? '';
+      await supabase.auth.signInWithPassword(email: email, password: ancien);
+      widget.onSave(nouveau);
+    } on AuthException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Ancien mot de passe incorrect'),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Une erreur est survenue'),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -2308,19 +2343,25 @@ class _ChangementMdpSheetState extends State<_ChangementMdpSheet> {
               ),
             ),
             const SizedBox(height: 20),
-            Text('Changer le mot de passe',
-                style: AppTextStyles.heading2),
+            Text('Changer le mot de passe', style: AppTextStyles.heading2),
             const SizedBox(height: 20),
             _buildMdpField(
+              'ANCIEN MOT DE PASSE',
+              _ancienCtrl,
+              _obscure0,
+              () => setState(() => _obscure0 = !_obscure0),
+            ),
+            const SizedBox(height: 16),
+            _buildMdpField(
               'NOUVEAU MOT DE PASSE',
-              _newMdpController,
+              _newCtrl,
               _obscure1,
               () => setState(() => _obscure1 = !_obscure1),
             ),
             const SizedBox(height: 16),
             _buildMdpField(
               'CONFIRMER LE MOT DE PASSE',
-              _confirmMdpController,
+              _confirmCtrl,
               _obscure2,
               () => setState(() => _obscure2 = !_obscure2),
             ),
@@ -2329,39 +2370,22 @@ class _ChangementMdpSheetState extends State<_ChangementMdpSheet> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: () {
-                  if (_newMdpController.text !=
-                      _confirmMdpController.text) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            'Les mots de passe ne correspondent pas'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
-                    return;
-                  }
-                  if (_newMdpController.text.length < 6) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Minimum 6 caractères'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
-                    return;
-                  }
-                  widget.onSave(_newMdpController.text);
-                },
+                onPressed: _isLoading ? null : _valider,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
+                  disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   elevation: 0,
                 ),
-                child: Text('ENREGISTRER', style: AppTextStyles.button),
+                child: _isLoading
+                    ? const SizedBox(width: 22, height: 22,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                    : Text('ENREGISTRER', style: AppTextStyles.button),
               ),
             ),
+            const SizedBox(height: 8),
           ],
         ),
       ),

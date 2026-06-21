@@ -76,9 +76,13 @@ class _CasuelsScreenState extends State<CasuelsScreen> {
     }
   }
 
-  // Filtrer les tarifs par catégorie
+  // Filtrer les tarifs par catégorie et dédupliquer par sous_type
   List<Map<String, dynamic>> _tarifsByCategorie(String categorie) {
-    return _tarifs.where((t) => t['categorie'] == categorie).toList();
+    final seen = <String>{};
+    return _tarifs.where((t) => t['categorie'] == categorie).where((t) {
+      final key = t['sous_type']?.toString() ?? '';
+      return seen.add(key);
+    }).toList();
   }
 
   // Calculer les frais mobile money (1% du montant)
