@@ -615,7 +615,28 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
     return now.isAfter(messeDt.subtract(Duration(minutes: delai)));
   }
 
-  String get _fullIntention => _intentionController.text.trim();
+  bool get _isPrefixed =>
+      _typeMesse == 'action_de_grace' ||
+      _typeMesse == 'assistance_protection' ||
+      _typeMesse == 'repos_ame';
+
+  String get _prefixLabel {
+    switch (_typeMesse) {
+      case 'action_de_grace':       return "Messe d'action de grâce pour ";
+      case 'assistance_protection': return "Aide, assistance et protection pour ";
+      case 'repos_ame':             return "Repos de l'âme de ";
+      default:                      return '';
+    }
+  }
+
+  String get _fullIntention {
+    if (_isPrefixed) {
+      final suffix = _intentionSuffixController.text.trim();
+      if (suffix.isEmpty) return '';
+      return '$_prefixLabel$suffix';
+    }
+    return _intentionController.text.trim();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -686,29 +707,61 @@ class _StepDetailsIntentionState extends State<_StepDetailsIntention> {
           ],
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: _intentionController,
-          maxLines: 6,
-          style: AppTextStyles.inputText,
-          decoration: InputDecoration(
-            hintText: 'Écrivez ici le nom ou l\'intention particulière...',
-            hintStyle: AppTextStyles.inputHint,
-            filled: true,
-            fillColor: AppColors.surface,
-            border: OutlineInputBorder(
+        if (_isPrefixed)
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
+              border: Border.all(color: AppColors.divider),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 1.5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _prefixLabel,
+                  style: AppTextStyles.inputText.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: _intentionSuffixController,
+                  maxLines: 4,
+                  style: AppTextStyles.inputText,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 6),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          TextField(
+            controller: _intentionController,
+            maxLines: 6,
+            style: AppTextStyles.inputText,
+            decoration: InputDecoration(
+              hintText: 'Écrivez ici le nom ou l\'intention particulière...',
+              hintStyle: AppTextStyles.inputHint,
+              filled: true,
+              fillColor: AppColors.surface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
               ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(
+                  color: AppColors.primary,
+                  width: 1.5,
+                ),
+              ),
+              contentPadding: const EdgeInsets.all(16),
             ),
-            contentPadding: const EdgeInsets.all(16),
           ),
-        ),
 
         const SizedBox(height: 32),
 
