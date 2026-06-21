@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "618886457271",
+    "project_id": "cathedrale-saint-andre",
+    "storage_bucket": "cathedrale-saint-andre.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:618886457271:android:069b295c7367662ec32a32",
+        "android_client_info": {
+          "package_name": "com.example.cathedrale_clean"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdp3rqeLHNG5_Hkf7h_KDiYWuDYuCt3EE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

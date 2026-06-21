@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import '../../features/actualites/screens/actualite_detail_screen.dart';
+import '../../features/annonces/screens/annonces_screen.dart';
 import '../../features/spirituel/screens/saint_jour_screen.dart';
 import '../../features/spirituel/screens/text_jour_screen.dart';
 
@@ -26,7 +27,11 @@ class DeepLinkService {
 
   static void dispose() => _sub?.cancel();
 
+  // Appelé depuis NotificationService (tap sur une notification)
+  static void navigateTo(Uri uri) => _navigate(uri);
+
   // saintandre://actualites/UUID  → ActualiteDetailScreen(id)
+  // saintandre://annonces         → AnnoncesScreen
   // saintandre://saint-du-jour    → SaintJourScreen
   // saintandre://texte-du-jour    → TexteJourScreen
   static void _navigate(Uri uri) {
@@ -44,6 +49,9 @@ class DeepLinkService {
       case 'actualites':
         final id = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
         if (id != null) screen = ActualiteDetailScreen(actualiteId: id);
+        break;
+      case 'annonces':
+        screen = const AnnoncesScreen();
         break;
       case 'saint-du-jour':
         screen = const SaintJourScreen();

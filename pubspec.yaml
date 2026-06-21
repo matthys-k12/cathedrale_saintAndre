@@ -57,6 +57,11 @@ dependencies:
   # Enregistrement d'images dans la galerie Android/iOS (API moderne)
   gal: ^1.3.0
 
+  # Notifications push Firebase
+  firebase_core: ^3.6.0
+  firebase_messaging: ^15.1.3
+  flutter_local_notifications: ^17.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
